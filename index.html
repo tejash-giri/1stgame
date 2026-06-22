@@ -2,424 +2,410 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <title>Block Puzzle</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <div id="app-container">
+<div id="app-container">
 
-    <!-- ═══ MENU ═══ -->
-    <section id="screen-menu" class="screen screen--active">
-      <div class="menu__inner">
-        <h1 class="menu__title">BLOCK<br>PUZZLE</h1>
-        <p class="menu__subtitle">Fit the blocks. Clear the lines.</p>
-        <div class="menu__score-badge">
-          <span class="score-badge__label">BEST</span>
-          <span class="score-badge__value" id="highest-score-value">0</span>
-        </div>
-        <button class="btn btn--play menu__play-btn" id="btn-play" aria-label="Play">
-          <span class="btn--play__text">PLAY</span>
-          <span class="btn--play__pulse"></span>
-        </button>
-        <div class="level-carousel" id="level-carousel" role="list" aria-label="Level selection"></div>
+  <!-- ═══ MENU ═══ -->
+  <section id="screen-menu" class="screen screen--active">
+    <div class="menu__inner">
+      <h1 class="menu__title">BLOCK<br>PUZZLE</h1>
+      <p class="menu__subtitle">Fit the blocks. Clear the lines.</p>
+      <div class="menu__score-badge">
+        <span class="score-badge__label">BEST</span>
+        <span class="score-badge__value" id="highest-score-value">0</span>
       </div>
-    </section>
+      <div class="level-grid" id="level-grid" role="list" aria-label="Level selection"></div>
+      <button class="btn btn--play menu__play-btn" id="btn-play" aria-label="Play">
+        <span class="btn--play__text">PLAY</span>
+        <span class="btn--play__pulse"></span>
+      </button>
+    </div>
+  </section>
 
-    <!-- ═══ GAME ═══ -->
-    <section id="screen-game" class="screen">
-      <header class="status-bar">
-        <button class="btn btn--icon status-bar__back" id="btn-back" aria-label="Back">
-          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
-        </button>
-        <div class="status-bar__score-area">
-          <span class="score-current" id="current-score">0</span>
-          <span class="score-label">Score</span>
-        </div>
-        <div class="status-bar__meta">
-          <span class="score-target">Target: <span id="target-score">500</span></span>
-          <span class="score-best">Best: <span id="best-score">0</span></span>
-        </div>
-      </header>
-
-      <div class="progress-bar"><div class="progress-bar__fill" id="progress-fill"></div></div>
-
-      <!-- Grid wrapper also serves as combo popup anchor -->
-      <div class="grid-wrapper" id="grid-wrapper">
-        <div class="grid-canvas" id="grid-canvas"></div>
+  <!-- ═══ GAME ═══ -->
+  <section id="screen-game" class="screen">
+    <header class="status-bar">
+      <button class="btn btn--icon status-bar__back" id="btn-back" aria-label="Back">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <div class="status-bar__score-area">
+        <span class="score-current" id="current-score">0</span>
+        <span class="score-label">Score</span>
       </div>
-
-      <div class="tray" id="piece-tray">
-        <div class="tray__slot" id="tray-slot-0" data-slot="0"></div>
-        <div class="tray__slot" id="tray-slot-1" data-slot="1"></div>
-        <div class="tray__slot" id="tray-slot-2" data-slot="2"></div>
+      <div class="status-bar__meta">
+        <span class="score-target">Target: <span id="target-score">500</span></span>
+        <span class="score-best">Best: <span id="best-score">0</span></span>
       </div>
-    </section>
+    </header>
+    <div class="progress-bar"><div class="progress-bar__fill" id="progress-fill"></div></div>
+    <div class="grid-wrapper" id="grid-wrapper">
+      <div class="grid-canvas" id="grid-canvas"></div>
+    </div>
+    <div class="tray" id="piece-tray">
+      <div class="tray__slot" id="tray-slot-0" data-slot="0"></div>
+      <div class="tray__slot" id="tray-slot-1" data-slot="1"></div>
+      <div class="tray__slot" id="tray-slot-2" data-slot="2"></div>
+    </div>
+  </section>
 
-    <!-- ═══ MODAL ═══ -->
-    <div id="modal-overlay" class="modal-overlay" aria-hidden="true">
-      <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
-        <div class="modal__icon" id="modal-icon">🏆</div>
-        <h2 class="modal__title" id="modal-title">Level Clear!</h2>
-        <p class="modal__message" id="modal-message">Amazing work!</p>
-        <div class="modal__score" id="modal-score">Score: 0</div>
-        <div class="modal__stars" id="modal-stars">
-          <span class="star" data-star="1">★</span>
-          <span class="star" data-star="2">★</span>
-          <span class="star" data-star="3">★</span>
-        </div>
-        <div class="modal__actions">
-          <button class="btn btn--secondary" id="btn-modal-menu">Menu</button>
-          <button class="btn btn--primary" id="btn-modal-retry">Retry</button>
-          <button class="btn btn--primary btn--accent" id="btn-modal-next">Next Level</button>
-        </div>
+  <!-- ═══ MODAL ═══ -->
+  <div id="modal-overlay" class="modal-overlay" aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+      <div class="modal__icon" id="modal-icon">🏆</div>
+      <h2 class="modal__title" id="modal-title">Level Clear!</h2>
+      <p class="modal__message" id="modal-message">Amazing work!</p>
+      <div class="modal__score" id="modal-score">Score: 0</div>
+      <div class="modal__stars" id="modal-stars">
+        <span class="star" data-star="1">★</span>
+        <span class="star" data-star="2">★</span>
+        <span class="star" data-star="3">★</span>
+      </div>
+      <div class="modal__actions">
+        <button class="btn btn--secondary" id="btn-modal-menu">Menu</button>
+        <button class="btn btn--primary" id="btn-modal-retry">Retry</button>
+        <button class="btn btn--primary btn--accent" id="btn-modal-next">Next Level</button>
       </div>
     </div>
-
   </div>
 
-  <script src="levels.js"></script>
-  <script src="game.js"></script>
-  <script>
-  (function () {
-    'use strict';
+</div>
 
-    function onReady(fn) {
-      if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', fn, { once: true });
-      } else { fn(); }
+<script src="levels.js"></script>
+<script src="game.js"></script>
+<script>
+(function(){
+  'use strict';
+
+  // ═══════════════════════════════════════════════════════════════
+  // SAFE INIT — wrapped so any error can't block the UI
+  // ═══════════════════════════════════════════════════════════════
+  try {
+
+  function onReady(fn){
+    if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',fn,{once:true});}
+    else{fn();}
+  }
+
+    // ── Level unlock persistence ──
+    function loadProg(){try{return JSON.parse(localStorage.getItem('bp_level_progress')||'{}');}catch(e){return{};}}
+    function saveProg(d){try{localStorage.setItem('bp_level_progress',JSON.stringify(d));}catch(e){}}
+    function isUnlocked(idx){
+      // LEVEL 1 (index 0) IS ALWAYS UNLOCKED — hard-forced
+      if(idx===0)return true;
+      // Also check the level config itself
+      if(GAME_LEVELS[idx]&&GAME_LEVELS[idx].isLocked===false)return true;
+      var p=loadProg();
+      return !!(p['lvl_'+(idx-1)]&&p['lvl_'+(idx-1)].cleared);
+    }
+    function markCleared(idx,score,stars){
+      var p=loadProg(),key='lvl_'+idx,ex=p[key]||{};
+      p[key]={cleared:true,score:Math.max(ex.score||0,score),stars:Math.max(ex.stars||0,stars)};
+      saveProg(p);
     }
 
-    onReady(function initUI() {
+    // ═══════════════════════════════════════════════════════════════
+    // MAIN INIT
+    // ═══════════════════════════════════════════════════════════════
+    onReady(function initUI(){
 
-      /* ── State ── */
-      var ui = {
-        screen: 'menu',
-        currentLevel: 0,
-        highestScore: parseInt(localStorage.getItem('bp_highest') || '0', 10),
-        _scoreAnimating: false,
-      };
+      var ui={screen:'menu',currentLevel:0,highestScore:parseInt(localStorage.getItem('bp_highest')||'0',10),_scoreAnimating:false};
 
-      /* ── DOM ── */
-      var $menu     = document.getElementById('screen-menu');
-      var $game     = document.getElementById('screen-game');
-      var $modal    = document.getElementById('modal-overlay');
-      var $grid     = document.getElementById('grid-canvas');
-      var $wrapper  = document.getElementById('grid-wrapper');
-      var $progress = document.getElementById('progress-fill');
-      var $curScore = document.getElementById('current-score');
-      var $tgtScore = document.getElementById('target-score');
-      var $bestScore= document.getElementById('best-score');
-      var $carousel = document.getElementById('level-carousel');
-      var $hiScore  = document.getElementById('highest-score-value');
+      var $menu=document.getElementById('screen-menu');
+      var $game=document.getElementById('screen-game');
+      var $modal=document.getElementById('modal-overlay');
+      var $grid=document.getElementById('grid-canvas');
+      var $wrapper=document.getElementById('grid-wrapper');
+      var $progress=document.getElementById('progress-fill');
+      var $curScore=document.getElementById('current-score');
+      var $tgtScore=document.getElementById('target-score');
+      var $bestScore=document.getElementById('best-score');
+      var $levelGrid=document.getElementById('level-grid');
+      var $hiScore=document.getElementById('highest-score-value');
 
-      /* ── Projection ── */
-      var _projCells = new Set();
-      function clearProj() {
-        _projCells.forEach(function (i) {
-          var c = $grid.children[i];
-          if (c) c.classList.remove('grid-cell--projected-valid', 'grid-cell--projected-invalid');
+      // ── Screen management ──
+      function showScreen(name){
+        ui.screen=name;
+        $menu.classList.toggle('screen--active',name==='menu');
+        $game.classList.toggle('screen--active',name==='game');
+      }
+
+      function showModal(type,score){
+        var cl=type==='clear';
+        document.getElementById('modal-icon').textContent=cl?'🏆':'💥';
+        document.getElementById('modal-title').textContent=cl?'Level Clear!':'Game Over';
+        document.getElementById('modal-message').textContent=cl?'Ready for the next challenge?':'No more moves available!';
+        document.getElementById('modal-score').textContent='Score: '+score;
+        var lvl=GAME_LEVELS[BlockPuzzle.GameState.activeLevel];
+        var ratio=score/(lvl?lvl.targetScore:500);
+        var stars=ratio>=1.5?3:ratio>=1.0?2:1;
+        document.querySelectorAll('#modal-stars .star').forEach(function(el,i){el.classList.toggle('star--lit',i<stars);});
+        document.getElementById('btn-modal-next').style.display=cl?'inline-flex':'none';
+        $modal.classList.add('modal-overlay--visible');
+        $modal.setAttribute('aria-hidden','false');
+      }
+      function hideModal(){$modal.classList.remove('modal-overlay--visible');$modal.setAttribute('aria-hidden','true');}
+
+      // ═══════════════════════════════════════════════════════════════
+      // LEVEL GRID — 3×2 matrix, direct onclick binding
+      // ═══════════════════════════════════════════════════════════════
+      function renderLevelGrid(){
+        $levelGrid.innerHTML='';
+        var prog=loadProg();
+        GAME_LEVELS.forEach(function(lvl,i){
+          var unlocked=isUnlocked(i);
+          var cardData=prog['lvl_'+i]||{};
+
+          var card=document.createElement('div');
+          card.className='level-card'+(unlocked?(i===ui.currentLevel?' level-card--active':''):' level-card--locked');
+          card.setAttribute('role','listitem');
+
+          if(unlocked){
+            // Build card content
+            card.innerHTML=
+              '<span class="level-card__num">'+lvl.levelID+'</span>'+
+              '<span class="level-card__label">'+lvl.difficultyLabel+'</span>'+
+              '<span class="level-card__target">🎯 '+lvl.targetScore+'</span>'+
+              (cardData.stars?'<span class="level-card__stars">'+'★'.repeat(cardData.stars)+'☆'.repeat(3-cardData.stars)+'</span>':'');
+
+            // ═══════════════════════════════════════════════════════
+            // DIRECT onclick — no IIFE, no closure issues, no bubbling problems
+            // ═══════════════════════════════════════════════════════
+            (function(cardEl,levelIdx){
+              cardEl.onclick=function(){
+                ui.currentLevel=levelIdx;
+                renderLevelGrid();
+                startGame();
+              };
+            })(card,i);
+
+          }else{
+            // LOCKED: pointer-events:none on the CARD ITSELF
+            card.style.pointerEvents='none';
+            card.innerHTML=
+              '<span class="level-card__num">'+lvl.levelID+'</span>'+
+              '<span class="level-card__label">Locked</span>'+
+              '<span class="level-card__target">🔒</span>'+
+              '<span class="level-card__lock">🔒</span>';
+          }
+          $levelGrid.appendChild(card);
         });
+      }
+
+      // ── Projection ──
+      var _projCells=new Set();
+      function clearProj(){
+        _projCells.forEach(function(i){var c=$grid.children[i];if(c)c.classList.remove('grid-cell--projected-valid','grid-cell--projected-invalid');});
         _projCells.clear();
       }
-      function highlightProj(aR, aC, valid, filled) {
+      function highlightProj(aR,aC,valid,filled){
         clearProj();
-        if (aR < 0 || aC < 0) return;
-        filled.forEach(function (cell) {
-          var br = aR + cell[0], bc = aC + cell[1];
-          if (br >= 0 && br < 8 && bc >= 0 && bc < 8) {
-            var idx = br * 8 + bc, el = $grid.children[idx];
-            if (el) { el.classList.add(valid ? 'grid-cell--projected-valid' : 'grid-cell--projected-invalid'); _projCells.add(idx); }
-          }
+        if(aR<0||aC<0)return;
+        filled.forEach(function(cell){var br=aR+cell[0],bc=aC+cell[1];
+          if(br>=0&&br<8&&bc>=0&&bc<8){var idx=br*8+bc,el=$grid.children[idx];
+            if(el){el.classList.add(valid?'grid-cell--projected-valid':'grid-cell--projected-invalid');_projCells.add(idx);}}
         });
       }
 
-      /* ── Screens ── */
-      function showScreen(name) {
-        ui.screen = name;
-        $menu.classList.toggle('screen--active', name === 'menu');
-        $game.classList.toggle('screen--active', name === 'game');
+      // ── Grid ──
+      function createGrid(){
+        $grid.innerHTML='';
+        for(var r=0;r<8;r++)for(var c=0;c<8;c++){var cell=document.createElement('div');cell.className='grid-cell';cell.dataset.row=r;cell.dataset.col=c;$grid.appendChild(cell);}
       }
-
-      function showModal(type, score) {
-        var isClear = type === 'clear';
-        document.getElementById('modal-icon').textContent    = isClear ? '🏆' : '💥';
-        document.getElementById('modal-title').textContent   = isClear ? 'Level Clear!' : 'Game Over';
-        document.getElementById('modal-message').textContent = isClear ? 'Ready for the next challenge?' : 'No more moves available!';
-        document.getElementById('modal-score').textContent   = 'Score: ' + score;
-        var lvl = GAME_LEVELS[BlockPuzzle.GameState.activeLevel];
-        var ratio = score / (lvl ? lvl.targetScore : 500);
-        var stars = ratio >= 1.5 ? 3 : ratio >= 1.0 ? 2 : 1;
-        document.querySelectorAll('#modal-stars .star').forEach(function (el, i) { el.classList.toggle('star--lit', i < stars); });
-        document.getElementById('btn-modal-next').style.display = isClear ? 'inline-flex' : 'none';
-        $modal.classList.add('modal-overlay--visible');
-        $modal.setAttribute('aria-hidden', 'false');
-      }
-      function hideModal() { $modal.classList.remove('modal-overlay--visible'); $modal.setAttribute('aria-hidden', 'true'); }
-
-      /* ── Carousel ── */
-      function renderCarousel() {
-        $carousel.innerHTML = '';
-        GAME_LEVELS.forEach(function (lvl, i) {
-          var item = document.createElement('div');
-          item.className = 'level-carousel__item' + (i === ui.currentLevel ? ' level-carousel__item--active' : '');
-          item.setAttribute('role', 'listitem');
-          item.innerHTML =
-            '<span class="level-carousel__num">' + lvl.levelID + '</span>' +
-            '<span class="level-carousel__diff">' + lvl.difficultyLabel + '</span>' +
-            '<span class="level-carousel__target">🎯 ' + lvl.targetScore + '</span>';
-          (function (idx) {
-            item.addEventListener('click', function () { ui.currentLevel = idx; renderCarousel(); });
-          })(i);
-          $carousel.appendChild(item);
-        });
-      }
-
-      /* ── Grid ── */
-      function createGrid() {
-        $grid.innerHTML = '';
-        for (var r = 0; r < 8; r++)
-          for (var c = 0; c < 8; c++) {
-            var cell = document.createElement('div');
-            cell.className = 'grid-cell';
-            cell.dataset.row = r;
-            cell.dataset.col = c;
-            $grid.appendChild(cell);
+      function renderGrid(){
+        var grid=BlockPuzzle.GameState.grid,cells=$grid.children;
+        for(var r=0;r<8;r++)for(var c=0;c<8;c++){
+          var idx=r*8+c,val=grid[r][c],cell=cells[idx];
+          cell.className='grid-cell';
+          cell.style.background='';cell.style.boxShadow='';cell.style.border='';
+          cell.style.setProperty('--block-glow','transparent');
+          cell.style.setProperty('--block-glow-faint','transparent');
+          if(val==='dead'){cell.classList.add('grid-cell--dead');}
+          else if(val!==0){cell.classList.add('grid-cell--filled');
+            cell.style.background='linear-gradient(145deg,'+val+'ee,'+val+'bb)';
+            cell.style.setProperty('--block-glow',val+'77');
+            cell.style.setProperty('--block-glow-faint',val+'33');
           }
+        }
       }
 
-      function renderGrid() {
-        var grid = BlockPuzzle.GameState.grid;
-        var cells = $grid.children;
-        for (var r = 0; r < 8; r++)
-          for (var c = 0; c < 8; c++) {
-            var idx = r * 8 + c, val = grid[r][c], cell = cells[idx];
-            cell.className = 'grid-cell';
-            cell.style.background = '';
-            cell.style.boxShadow = '';
-            cell.style.border = '';
-            cell.style.setProperty('--block-glow', 'transparent');
-            cell.style.setProperty('--block-glow-faint', 'transparent');
-            if (val === 'dead') {
-              cell.classList.add('grid-cell--dead');
-            } else if (val !== 0) {
-              cell.classList.add('grid-cell--filled');
-              // Vibrant solid gradient with high-contrast neon
-              cell.style.background = 'linear-gradient(145deg, ' + val + 'ee, ' + val + 'bb)';
-              cell.style.setProperty('--block-glow', val + '77');
-              cell.style.setProperty('--block-glow-faint', val + '33');
+      // ── Tray: Dynamic scaler ──
+      function renderTray(){
+        var pieces=BlockPuzzle.GameState.trayPieces;
+        var trayCellPx=9,trayMaxPx=65;
+        for(var i=0;i<3;i++){
+          var slot=document.getElementById('tray-slot-'+i);
+          var piece=pieces[i];
+          slot.innerHTML='';
+          slot.classList.remove('tray__slot--selected','tray__slot--empty');
+          if(piece===null){slot.classList.add('tray__slot--empty');continue;}
+          var shape=piece.shapeMatrix;
+          var dims=BlockPuzzle.getShapeDimensions(shape);
+          var rows=dims.rows,cols=dims.cols;
+          var maxDim=Math.max(rows,cols);
+          var rawSize=maxDim*trayCellPx;
+          var scale=rawSize>trayMaxPx?trayMaxPx/rawSize:1;
+          scale=Math.max(0.4,Math.min(1,scale));
+          var gridContainer=document.createElement('div');
+          gridContainer.style.overflow='visible';
+          gridContainer.style.display='flex';
+          gridContainer.style.flexDirection='column';
+          gridContainer.style.alignItems='center';
+          gridContainer.style.justifyContent='center';
+          gridContainer.style.gap='1px';
+          gridContainer.style.transform='scale('+scale.toFixed(3)+')';
+          gridContainer.style.transformOrigin='center center';
+          var filled=BlockPuzzle.getFilledCells(shape);
+          for(var r=0;r<rows;r++){
+            var rowDiv=document.createElement('div');
+            rowDiv.style.display='flex';rowDiv.style.gap='1px';
+            for(var c=0;c<cols;c++){
+              var isF=filled.some(function(fc){return fc[0]===r&&fc[1]===c;});
+              var block=document.createElement('div');
+              block.style.width=trayCellPx+'px';block.style.height=trayCellPx+'px';block.style.borderRadius='1px';
+              if(isF){block.style.background='linear-gradient(135deg,'+piece.color+','+piece.color+'cc)';block.style.boxShadow='inset 0 1px 1px rgba(255,255,255,0.3),0 0 4px '+piece.color+'44';}
+              else{block.style.background='transparent';}
+              rowDiv.appendChild(block);
             }
+            gridContainer.appendChild(rowDiv);
           }
-      }
-
-      /* ── Tray ── */
-      function renderTray() {
-        var pieces = BlockPuzzle.GameState.trayPieces;
-        for (var i = 0; i < 3; i++) {
-          var slot = document.getElementById('tray-slot-' + i);
-          var piece = pieces[i];
-          slot.innerHTML = '';
-          slot.classList.remove('tray__slot--selected', 'tray__slot--empty');
-          if (piece === null) { slot.classList.add('tray__slot--empty'); continue; }
-          var shape = piece.shapeMatrix;
-          var dims = BlockPuzzle.getShapeDimensions(shape);
-          var maxR = dims.rows, maxC = dims.cols;
-
-          // Scale the preview so large shapes fit inside the 80×80 slot.
-          // The slot is 80px; we want the preview grid to fill ~70% of it.
-          // Each "cell" in the preview grid is sized proportionally.
-          // Max dimension (in cells): scale = 56 / (maxDim * cellPx)
-          // We use a virtual cell size of 10px as base, then scale down.
-          var slotSize = 70; // usable area in px
-          var cellPx = 10;   // base cell size for preview
-          var shapePx = Math.max(maxR, maxC) * cellPx;
-          var scale = shapePx > slotSize ? slotSize / shapePx : 1;
-          // Clamp: never scale above 1, never below 0.35
-          scale = Math.max(0.35, Math.min(1, scale));
-
-          // Build the unscaled grid
-          var gridEl = document.createElement('div');
-          gridEl.style.display = 'grid';
-          gridEl.style.gridTemplateRows = 'repeat(' + maxR + ', 1fr)';
-          gridEl.style.gridTemplateColumns = 'repeat(' + maxC + ', 1fr)';
-          gridEl.style.gap = '1px';
-          gridEl.style.width = (maxC * cellPx) + 'px';
-          gridEl.style.height = (maxR * cellPx) + 'px';
-
-          var filled = BlockPuzzle.getFilledCells(shape);
-          for (var r = 0; r < maxR; r++)
-            for (var c = 0; c < maxC; c++) {
-              var isF = filled.some(function (fc) { return fc[0] === r && fc[1] === c; });
-              var block = document.createElement('div');
-              block.style.borderRadius = '2px';
-              if (isF) {
-                block.style.background = 'linear-gradient(135deg, ' + piece.color + ', ' + piece.color + 'cc)';
-                block.style.boxShadow = 'inset 0 1px 1px rgba(255,255,255,0.3), 0 0 4px ' + piece.color + '44';
-              } else {
-                block.style.background = 'transparent';
-              }
-              block.className = 'piece-preview__block' + (isF ? ' piece-preview__block--filled' : '');
-              gridEl.appendChild(block);
-            }
-
-          // Wrapper that centers and scales the grid
-          var preview = document.createElement('div');
-          preview.className = 'piece-preview';
-          preview.style.display = 'flex';
-          preview.style.alignItems = 'center';
-          preview.style.justifyContent = 'center';
-          preview.style.transform = 'scale(' + scale.toFixed(3) + ')';
-          preview.style.transformOrigin = 'center center';
-          preview.appendChild(gridEl);
+          var preview=document.createElement('div');
+          preview.className='piece-preview';
+          preview.appendChild(gridContainer);
           slot.appendChild(preview);
         }
       }
 
-      /* ── HUD ── */
-      function updateHUD() {
-        var gs = BlockPuzzle.GameState;
-        $curScore.textContent = Math.floor(gs.currentScore);
-        var pct = Math.min(100, (gs.currentScore / gs.targetScore) * 100);
-        $progress.style.width = pct + '%';
-        if (gs.currentScore > ui.highestScore) {
-          ui.highestScore = Math.floor(gs.currentScore);
-          localStorage.setItem('bp_highest', ui.highestScore);
-          $hiScore.textContent = ui.highestScore;
-          $bestScore.textContent = ui.highestScore;
-        }
+      // ── HUD ──
+      function updateHUD(){
+        var gs=BlockPuzzle.GameState;
+        $curScore.textContent=Math.floor(gs.currentScore);
+        var pct=Math.min(100,(gs.currentScore/gs.targetScore)*100);
+        $progress.style.width=pct+'%';
+        if(gs.currentScore>ui.highestScore){ui.highestScore=Math.floor(gs.currentScore);localStorage.setItem('bp_highest',ui.highestScore);$hiScore.textContent=ui.highestScore;$bestScore.textContent=ui.highestScore;}
+      }
+      function animateScoreDisplay(from,to){
+        if(ui._scoreAnimating)return;
+        ui._scoreAnimating=true;
+        BlockPuzzle.AnimCtrl.animateScore(from,to,300,function(val){$curScore.textContent=val;});
+        setTimeout(function(){ui._scoreAnimating=false;},320);
+      }
+      function spawnComboPopup(text,row,col){
+        var gr=$grid.getBoundingClientRect(),wr=$wrapper.getBoundingClientRect();
+        var cs=gr.width/8;
+        var x=gr.left-wr.left+(col+0.5)*cs;
+        var y=gr.top-wr.top+row*cs;
+        BlockPuzzle.AnimCtrl.spawnComboPopup(text,$wrapper,x,y);
       }
 
-      /* ── Smooth score animation ── */
-      function animateScoreDisplay(from, to) {
-        if (ui._scoreAnimating) return;
-        ui._scoreAnimating = true;
-        BlockPuzzle.AnimCtrl.animateScore(from, to, 300, function (val) {
-          $curScore.textContent = val;
-        });
-        setTimeout(function () { ui._scoreAnimating = false; }, 320);
-      }
-
-      /* ── Combo popup ── */
-      function spawnComboPopup(text, row, col) {
-        var gridRect = $grid.getBoundingClientRect();
-        var wrapperRect = $wrapper.getBoundingClientRect();
-        var cellSize = gridRect.width / 8;
-        var x = gridRect.left - wrapperRect.left + (col + 0.5) * cellSize;
-        var y = gridRect.top - wrapperRect.top + row * cellSize;
-        BlockPuzzle.AnimCtrl.spawnComboPopup(text, $wrapper, x, y);
-      }
-
-      /* ═══════════════════════════════════════════════════════
-         DRAG CONTROLLER
-         ═══════════════════════════════════════════════════════ */
-
-      var dragCtrl = new BlockPuzzle.DragController({
-        onCommit: function (trayIndex, gR, gC, piece) {
+      // ── Drag Controller ──
+      var dragCtrl=new BlockPuzzle.DragController({
+        onCommit:function(ti,gR,gC,piece){
           clearProj();
-          var result = BlockPuzzle.placeBlock(gR, gC, piece.shapeMatrix, piece.color, trayIndex);
-          var gs = BlockPuzzle.GameState;
-
-          // Blast animation for cleared lines
-          if (result.linesCleared > 0) {
-            // Calculate center of blast for popup
-            var allRows = result.clearedRows, allCols = result.clearedCols;
-            var centerR = 0, centerC = 0, cnt = 0;
-            allRows.forEach(function (r) { centerR += r; cnt++; });
-            allCols.forEach(function (c) { centerC += c; cnt++; });
-            if (cnt > 0) { centerR /= cnt; centerC /= cnt; }
-
-            // Spawn combo popup before blast
-            var comboText = '+' + result.scoreGained;
-            if (result.combo > 1) comboText += ' x' + result.combo + ' Combo!';
-            spawnComboPopup(comboText, centerR, centerC);
-
-            // Animate blast, then update grid
-            BlockPuzzle.AnimCtrl.blastLines(allRows, allCols, $grid).then(function () {
-              renderGrid();
-              renderTray();
-            });
-          } else {
-            renderGrid();
-            renderTray();
-          }
-
-          // Smooth score counter
-          var prevScore = gs.currentScore - result.scoreGained;
-          animateScoreDisplay(Math.floor(prevScore), Math.floor(gs.currentScore));
+          var result=BlockPuzzle.placeBlock(gR,gC,piece.shapeMatrix,piece.color,ti);
+          var gs=BlockPuzzle.GameState;
+          if(result.linesCleared>0){
+            var aR=0,aC=0,cnt=0;
+            result.clearedRows.forEach(function(r){aR+=r;cnt++;});
+            result.clearedCols.forEach(function(c){aC+=c;cnt++;});
+            if(cnt>0){aR/=cnt;aC/=cnt;}
+            var ct='+'+result.scoreGained;if(result.combo>1)ct+=' x'+result.combo+' Combo!';
+            spawnComboPopup(ct,aR,aC);
+            BlockPuzzle.AnimCtrl.blastLines(result.clearedRows,result.clearedCols,$grid).then(function(){renderGrid();renderTray();});
+          }else{renderGrid();renderTray();}
+          var prev=gs.currentScore-result.scoreGained;
+          animateScoreDisplay(Math.floor(prev),Math.floor(gs.currentScore));
           updateHUD();
-
-          // Check end conditions after blast completes
-          var delay = result.linesCleared > 0 ? 500 : 50;
-          setTimeout(function () {
-            var endState = BlockPuzzle.checkEndConditions();
-            if (endState.state === 'victory') {
-              setTimeout(function () { showModal('clear', Math.floor(gs.currentScore)); }, 100);
-            } else if (endState.state === 'gameover') {
-              setTimeout(function () { showModal('over', Math.floor(gs.currentScore)); }, 100);
-            }
-          }, delay);
+          var delay=result.linesCleared>0?500:50;
+          setTimeout(function(){
+            var es=BlockPuzzle.checkEndConditions();
+            if(es.state==='victory'){setTimeout(function(){
+              var fs=Math.floor(gs.currentScore),ratio=fs/(GAME_LEVELS[gs.activeLevel].targetScore);
+              var stars=ratio>=1.5?3:ratio>=1.0?2:1;
+              markCleared(gs.activeLevel,fs,stars);
+              showModal('clear',fs);
+            },100);}
+            else if(es.state==='gameover'){setTimeout(function(){showModal('over',Math.floor(gs.currentScore));},100);}
+          },delay);
         },
-        onCancel: function () { clearProj(); renderTray(); },
-        onProjectionChange: function (aR, aC, valid, filled) { highlightProj(aR, aC, valid, filled); },
-        getCellSize: function () { return $grid.getBoundingClientRect().width / 8; },
-        isValidFn: function (r, c, s) { return BlockPuzzle.isValidPlacement(r, c, s); },
-        getFilledCells: function (s) { return BlockPuzzle.getFilledCells(s); },
+        onCancel:function(){clearProj();renderTray();},
+        onProjectionChange:function(aR,aC,v,f){highlightProj(aR,aC,v,f);},
+        isValidFn:function(r,c,s){return BlockPuzzle.isValidPlacement(r,c,s);},
+        getFilledCells:function(s){return BlockPuzzle.getFilledCells(s);},
       });
 
-      function onTrayPointerDown(e, idx) {
-        var gs = BlockPuzzle.GameState;
-        if (gs.isGameOver || gs.isLevelClear) return;
-        if (gs.trayPieces[idx] === null) return;
-        var slot = document.getElementById('tray-slot-' + idx);
+      function onTrayPointerDown(e,idx){
+        var gs=BlockPuzzle.GameState;
+        if(gs.isGameOver||gs.isLevelClear)return;
+        if(gs.trayPieces[idx]===null)return;
+        var slot=document.getElementById('tray-slot-'+idx);
         slot.classList.add('tray__slot--selected');
-        dragCtrl.start(e, idx, gs.trayPieces[idx], $grid, slot);
+        dragCtrl.start(e,idx,gs.trayPieces[idx],$grid,slot);
       }
 
-      /* ═══════════════════════════════════════════════════════
-         GAME INIT
-         ═══════════════════════════════════════════════════════ */
-
-      function startGame() {
+      // ═══════════════════════════════════════════════════════════════
+      // GAME INIT — the function that transitions menu → gameplay
+      // ═══════════════════════════════════════════════════════════════
+      function startGame(){
+        // Safety: don't start locked levels
+        if(!isUnlocked(ui.currentLevel)){
+          console.warn('Level '+(ui.currentLevel+1)+' is locked');
+          return;
+        }
         BlockPuzzle.initLevel(ui.currentLevel);
-        var lvl = GAME_LEVELS[ui.currentLevel];
-        $tgtScore.textContent = lvl.targetScore;
-        $bestScore.textContent = ui.highestScore;
-        $curScore.textContent = '0';
-        $progress.style.width = '0%';
-        createGrid();
-        renderGrid();
-        renderTray();
-        showScreen('game');
-        hideModal();
+        var lvl=GAME_LEVELS[ui.currentLevel];
+        $tgtScore.textContent=lvl.targetScore;
+        $bestScore.textContent=ui.highestScore;
+        $curScore.textContent='0';
+        $progress.style.width='0%';
+        createGrid();renderGrid();renderTray();
+        showScreen('game');hideModal();
       }
+      // Expose globally so level cards can call it
+      window.startGame=startGame;
 
-      window.startGame = startGame;
-
-      /* ═══════════════════════════════════════════════════════
-         EVENT LISTENERS
-         ═══════════════════════════════════════════════════════ */
-
-      document.getElementById('btn-play').addEventListener('click', function () { startGame(); });
-      document.getElementById('btn-back').addEventListener('click', function () { showScreen('menu'); renderCarousel(); });
-
-      [0, 1, 2].forEach(function (i) {
-        var slot = document.getElementById('tray-slot-' + i);
-        slot.addEventListener('pointerdown', function (e) { onTrayPointerDown(e, i); });
+      // ═══════════════════════════════════════════════════════════════
+      // EVENT LISTENERS
+      // ═══════════════════════════════════════════════════════════════
+      document.getElementById('btn-play').onclick=function(){startGame();};
+      document.getElementById('btn-back').onclick=function(){showScreen('menu');renderLevelGrid();};
+      [0,1,2].forEach(function(i){
+        document.getElementById('tray-slot-'+i).addEventListener('pointerdown',function(e){onTrayPointerDown(e,i);});
       });
-
-      document.getElementById('btn-modal-menu').addEventListener('click', function () { hideModal(); showScreen('menu'); renderCarousel(); });
-      document.getElementById('btn-modal-retry').addEventListener('click', function () { startGame(); });
-      document.getElementById('btn-modal-next').addEventListener('click', function () {
-        if (ui.currentLevel < GAME_LEVELS.length - 1) ui.currentLevel++;
+      document.getElementById('btn-modal-menu').onclick=function(){hideModal();showScreen('menu');renderLevelGrid();};
+      document.getElementById('btn-modal-retry').onclick=function(){startGame();};
+      document.getElementById('btn-modal-next').onclick=function(){
+        if(ui.currentLevel<GAME_LEVELS.length-1)ui.currentLevel++;
         startGame();
-      });
+      };
 
-      /* ─── Init ─── */
-      $hiScore.textContent = ui.highestScore;
-      renderCarousel();
+      // Prevent rubber-banding on game screen only
+      document.getElementById('screen-game').addEventListener('touchmove',function(e){e.preventDefault();},{passive:false});
+
+      // ── Init ──
+      $hiScore.textContent=ui.highestScore;
+      renderLevelGrid();
 
     }); // end onReady
-  })();
-  </script>
+
+  }catch(e){
+    // ═══════════════════════════════════════════════════════════════
+    // DEBUG FALLBACK: If anything throws, log it but don't block the UI
+    // ═══════════════════════════════════════════════════════════════
+    console.error('[BlockPuzzle] Init error:',e);
+    // Try to show at least the menu
+    try{
+      var menu=document.getElementById('screen-menu');
+      if(menu)menu.classList.add('screen--active');
+    }catch(_){}
+  }
+
+})();
+</script>
 </body>
 </html>
