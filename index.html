@@ -11,12 +11,11 @@
 <body>
 <div id="app-container">
 
-  <!-- ═══ MENU ═══ -->
+  <!-- MENU -->
   <section id="screen-menu" class="screen screen--active">
     <div class="menu__inner">
       <h1 class="menu__title">BLOCK<br>PUZZLE</h1>
       <p class="menu__subtitle">Select a mode to begin</p>
-
       <div class="mode-grid" role="list" aria-label="Mode selection">
         <div class="mode-card mode-card--easy" role="listitem" data-mode="easy" tabindex="0" aria-label="Easy mode">
           <span class="mode-card__icon">🌿</span>
@@ -40,7 +39,7 @@
     </div>
   </section>
 
-  <!-- ═══ GAME ═══ -->
+  <!-- GAME -->
   <section id="screen-game" class="screen">
     <header class="status-bar">
       <button class="btn btn--icon status-bar__back" id="btn-back" aria-label="Back">
@@ -65,7 +64,7 @@
     </div>
   </section>
 
-  <!-- ═══ GAME OVER MODAL ═══ -->
+  <!-- GAME OVER MODAL -->
   <div id="gameOverModal" class="game-over-modal" aria-hidden="true">
     <div class="game-over__dialog" role="dialog" aria-modal="true" aria-labelledby="gameOverTitle">
       <div class="game-over__skull">💀</div>
@@ -94,262 +93,347 @@
 <script src="game.js"></script>
 <script>
 (function(){
-  'use strict';
-  try {
+'use strict';
+try {
 
-  function onReady(fn){
-    if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',fn,{once:true});}
-    else{fn();}
+function onReady(fn){
+  if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',fn,{once:true});}
+  else{fn();}
+}
+
+var GRID = BlockPuzzle.GRID;
+
+onReady(function initUI(){
+
+  var ui = { screen:'menu', activeMode:null, _scoreAnimating:false };
+
+  var $menu  = document.getElementById('screen-menu');
+  var $game  = document.getElementById('screen-game');
+  var $goModal = document.getElementById('gameOverModal');
+  var $grid  = document.getElementById('grid-canvas');
+  var $wrapper = document.getElementById('grid-wrapper');
+  var $curScore = document.getElementById('current-score');
+  var $bestScore = document.getElementById('best-score');
+  var $modeIndicator = document.getElementById('mode-indicator');
+
+  // ── Screens ──
+  function showScreen(name){
+    ui.screen=name;
+    $menu.classList.toggle('screen--active',name==='menu');
+    $game.classList.toggle('screen--active',name==='game');
   }
 
-  var GRID = BlockPuzzle.GRID;
+  // ── Game Over Modal ──
+  function showGameOver(finalScore,bestScore,isNewBest){
+    document.getElementById('goFinalScore').textContent=finalScore;
+    document.getElementById('goBestScore').textContent=bestScore;
+    document.getElementById('goNewBest').style.display=isNewBest?'block':'none';
+    $goModal.classList.add('game-over-modal--visible');
+    $goModal.setAttribute('aria-hidden','false');
+  }
+  function hideGameOver(){
+    $goModal.classList.remove('game-over-modal--visible');
+    $goModal.setAttribute('aria-hidden','true');
+  }
 
-  onReady(function initUI(){
-
-    var ui = { screen: 'menu', activeMode: null, _scoreAnimating: false };
-
-    var $menu = document.getElementById('screen-menu');
-    var $game = document.getElementById('screen-game');
-    var $goModal = document.getElementById('gameOverModal');
-    var $grid = document.getElementById('grid-canvas');
-    var $wrapper = document.getElementById('grid-wrapper');
-    var $curScore = document.getElementById('current-score');
-    var $bestScore = document.getElementById('best-score');
-    var $modeIndicator = document.getElementById('mode-indicator');
-
-    // ── Screens ──
-    function showScreen(name){
-      ui.screen = name;
-      $menu.classList.toggle('screen--active', name === 'menu');
-      $game.classList.toggle('screen--active', name === 'game');
-    }
-
-    // ── Game Over Modal ──
-    function showGameOver(finalScore, bestScore, isNewBest){
-      document.getElementById('goFinalScore').textContent = finalScore;
-      document.getElementById('goBestScore').textContent = bestScore;
-      var nb = document.getElementById('goNewBest');
-      nb.style.display = isNewBest ? 'block' : 'none';
-      $goModal.classList.add('game-over-modal--visible');
-      $goModal.setAttribute('aria-hidden', 'false');
-    }
-
-    function hideGameOver(){
-      $goModal.classList.remove('game-over-modal--visible');
-      $goModal.setAttribute('aria-hidden', 'true');
-    }
-
-    // ── Mode cards ──
-    function updateModeBestScores(){
-      var modes = ['easy','medium','hard'];
-      modes.forEach(function(m){
-        var el = document.getElementById('best-' + m);
-        if(el) el.textContent = 'Best: ' + BlockPuzzle.getModeHigh(m);
-      });
-    }
-
-    function onModeCardClick(mode){
-      ui.activeMode = mode;
-      startGame(mode);
-    }
-
-    document.querySelectorAll('.mode-card').forEach(function(card){
-      card.addEventListener('click', function(){
-        var mode = card.dataset.mode;
-        if(mode) onModeCardClick(mode);
-      });
-      card.addEventListener('keydown', function(e){
-        if(e.key === 'Enter' || e.key === ' '){
-          e.preventDefault();
-          var mode = card.dataset.mode;
-          if(mode) onModeCardClick(mode);
-        }
-      });
+  // ── Mode best scores ──
+  function updateModeBestScores(){
+    ['easy','medium','hard'].forEach(function(m){
+      var el=document.getElementById('best-'+m);
+      if(el)el.textContent='Best: '+BlockPuzzle.getModeHigh(m);
     });
+  }
 
-    // ── Projection ──
-    var _projCells = new Set();
-    function clearProj(){
-      _projCells.forEach(function(i){var c=$grid.children[i];if(c)c.classList.remove('grid-cell--projected-valid','grid-cell--projected-invalid');});
-      _projCells.clear();
-    }
-    function highlightProj(aR,aC,valid,filled){
-      clearProj();
-      if(aR<0||aC<0)return;
-      filled.forEach(function(cell){var br=aR+cell[0],bc=aC+cell[1];
-        if(br>=0&&br<GRID&&bc>=0&&bc<GRID){var idx=br*GRID+bc,el=$grid.children[idx];
-          if(el){el.classList.add(valid?'grid-cell--projected-valid':'grid-cell--projected-invalid');_projCells.add(idx);}}
-      });
-    }
+  // ── Mode card click ──
+  document.querySelectorAll('.mode-card').forEach(function(card){
+    card.addEventListener('click',function(){
+      var mode=card.dataset.mode;
+      if(mode){ui.activeMode=mode;startGame(mode);}
+    });
+    card.addEventListener('keydown',function(e){
+      if(e.key==='Enter'||e.key===' '){e.preventDefault();var mode=card.dataset.mode;if(mode){ui.activeMode=mode;startGame(mode);}}
+    });
+  });
 
-    // ── Grid (6×6) ──
-    function createGrid(){
-      $grid.innerHTML='';
-      for(var r=0;r<GRID;r++)for(var c=0;c<GRID;c++){var cell=document.createElement('div');cell.className='grid-cell';cell.dataset.row=r;cell.dataset.col=c;$grid.appendChild(cell);}
+  // ── Projection ──
+  var _projCells = [];
+  function clearProj(){
+    for(var i=0;i<_projCells.length;i++){
+      var c=$grid.children[_projCells[i]];
+      if(c)c.className='grid-cell';
     }
-    function renderGrid(){
-      var grid=BlockPuzzle.G.grid,cells=$grid.children;
-      for(var r=0;r<GRID;r++)for(var c=0;c<GRID;c++){
-        var idx=r*GRID+c,val=grid[r][c],cell=cells[idx];
-        cell.className='grid-cell';
-        cell.style.background='';cell.style.boxShadow='';cell.style.border='';
-        cell.style.setProperty('--block-glow','transparent');
-        cell.style.setProperty('--block-glow-faint','transparent');
-        if(val==='dead'){cell.classList.add('grid-cell--dead');}
-        else if(val!==0){cell.classList.add('grid-cell--filled');
+    _projCells=[];
+  }
+  function highlightProj(aR,aC,valid,filled){
+    clearProj();
+    if(aR<0||aC<0)return;
+    var cls=valid?'grid-cell grid-cell--projected-valid':'grid-cell grid-cell--projected-invalid';
+    for(var f=0;f<filled.length;f++){
+      var br=aR+filled[f][0],bc=aC+filled[f][1];
+      if(br>=0&&br<GRID&&bc>=0&&bc<GRID){
+        var idx=br*GRID+bc;
+        var el=$grid.children[idx];
+        if(el){el.className=cls;_projCells.push(idx);}
+      }
+    }
+  }
+
+  // ────────────────────────────────────────────────────────────
+  // OPTIMIZED GRID RENDERER — dirty-cell diffing
+  // Tracks previous state; only touches DOM for changed cells.
+  // On 6×6 = 36 cells, a typical placement changes 1-9 cells.
+  // ────────────────────────────────────────────────────────────
+  var _prevGrid = null; // flat array of GRID*GRID prev values
+
+  function createGrid(){
+    $grid.innerHTML='';
+    var frag=document.createDocumentFragment();
+    for(var r=0;r<GRID;r++)for(var c=0;c<GRID;c++){
+      var cell=document.createElement('div');
+      cell.className='grid-cell';
+      cell.dataset.row=r;cell.dataset.col=c;
+      frag.appendChild(cell);
+    }
+    $grid.appendChild(frag);
+    _prevGrid=null; // force full repaint on first render
+  }
+
+  function renderGrid(){
+    var grid=BlockPuzzle.G.grid;
+    var cells=$grid.children;
+    var prev=_prevGrid;
+    if(!prev){prev=new Array(GRID*GRID);for(var x=0;x<GRID*GRID;x++)prev[x]=undefined;}
+
+    for(var r=0;r<GRID;r++){
+      for(var c=0;c<GRID;c++){
+        var idx=r*GRID+c;
+        var val=grid[r][c];
+        if(val===prev[idx])continue; // SKIP — unchanged cell
+        prev[idx]=val;
+
+        var cell=cells[idx];
+        // Remove projection classes too (projection cleared separately)
+        if(val==='dead'){
+          cell.className='grid-cell grid-cell--dead';
+          cell.style.background='';
+          cell.style.setProperty('--block-glow','transparent');
+        }else if(val!==0){
+          cell.className='grid-cell grid-cell--filled';
           cell.style.background='linear-gradient(145deg,'+val+'ee,'+val+'bb)';
-          cell.style.setProperty('--block-glow',val+'77');
-          cell.style.setProperty('--block-glow-faint',val+'33');
+          cell.style.setProperty('--block-glow',val+'66');
+        }else{
+          cell.className='grid-cell';
+          cell.style.background='';
+          cell.style.setProperty('--block-glow','transparent');
         }
       }
     }
-
-    // ── Tray: constant 0.55× scale via CSS class ──
-    function renderTray(){
-      var pieces=BlockPuzzle.G.trayPieces;
-      var trayCellPx=9,trayMaxPx=65;
-      for(var i=0;i<3;i++){
-        var slot=document.getElementById('tray-slot-'+i);
-        var piece=pieces[i];
-        slot.innerHTML='';
-        slot.classList.remove('tray__slot--selected','tray__slot--empty');
-        if(piece===null){slot.classList.add('tray__slot--empty');continue;}
-        var shape=piece.shapeMatrix;
-        var dims=BlockPuzzle.getDims(shape);
-        var rows=dims.rows,cols=dims.cols;
-        var maxDim=Math.max(rows,cols);
-        var rawSize=maxDim*trayCellPx;
-        var scale=rawSize>trayMaxPx?trayMaxPx/rawSize:1;
-        scale=Math.max(0.4,Math.min(1,scale));
-        var gridContainer=document.createElement('div');
-        gridContainer.style.cssText='overflow:visible;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;transform:scale('+scale.toFixed(3)+');transform-origin:center center;';
-        var filled=BlockPuzzle.getFilled(shape);
-        for(var r=0;r<rows;r++){
-          var rowDiv=document.createElement('div');
-          rowDiv.style.cssText='display:flex;gap:1px;';
-          for(var c=0;c<cols;c++){
-            var isF=filled.some(function(fc){return fc[0]===r&&fc[1]===c;});
-            var block=document.createElement('div');
-            block.style.cssText='width:'+trayCellPx+'px;height:'+trayCellPx+'px;border-radius:1px;'+(isF?'background:linear-gradient(135deg,'+piece.color+','+piece.color+'cc);box-shadow:inset 0 1px 1px rgba(255,255,255,.3),0 0 4px '+piece.color+'44;':'background:transparent;');
-            rowDiv.appendChild(block);
-          }
-          gridContainer.appendChild(rowDiv);
-        }
-        var preview=document.createElement('div');
-        preview.className='piece-preview';
-        preview.appendChild(gridContainer);
-        slot.appendChild(preview);
-      }
-    }
-
-    // ── HUD ──
-    function updateHUD(){
-      var gs=BlockPuzzle.G;
-      $curScore.textContent=Math.floor(gs.currentScore);
-      var modeHigh = BlockPuzzle.getModeHigh(gs.activeMode);
-      if(gs.currentScore > modeHigh){
-        BlockPuzzle.setModeHigh(gs.activeMode, Math.floor(gs.currentScore));
-        $bestScore.textContent = Math.floor(gs.currentScore);
-      }
-    }
-
-    function animateScoreDisplay(from,to){
-      if(ui._scoreAnimating)return;
-      ui._scoreAnimating=true;
-      BlockPuzzle.AnimCtrl.animateScore(from,to,300,function(val){$curScore.textContent=val;});
-      setTimeout(function(){ui._scoreAnimating=false;},320);
-    }
-
-    function spawnComboPopup(text,row,col){
-      var gr=$grid.getBoundingClientRect(),wr=$wrapper.getBoundingClientRect();
-      var cs=gr.width/GRID;
-      var x=gr.left-wr.left+(col+0.5)*cs;
-      var y=gr.top-wr.top+row*cs;
-      BlockPuzzle.AnimCtrl.spawnComboPopup(text,$wrapper,x,y);
-    }
-
-    // ── Drag Controller ──
-    var dragCtrl=new BlockPuzzle.DragController({
-      onCommit:function(ti,gR,gC,piece){
-        clearProj();
-        var result=BlockPuzzle.placeBlock(gR,gC,piece.shapeMatrix,piece.color,ti);
-        var gs=BlockPuzzle.G;
-        if(result.lines>0){
-          var aR=0,aC=0,cnt=0;
-          result.rows.forEach(function(r){aR+=r;cnt++;});
-          result.cols.forEach(function(c){aC+=c;cnt++;});
-          if(cnt>0){aR/=cnt;aC/=cnt;}
-          var ct='+'+result.scoreGained;if(result.combo>1)ct+=' x'+result.combo+' Combo!';
-          spawnComboPopup(ct,aR,aC);
-          BlockPuzzle.AnimCtrl.blastLines(result.rows,result.cols,$grid).then(function(){renderGrid();renderTray();});
-        }else{renderGrid();renderTray();}
-        var prev=gs.currentScore-result.scoreGained;
-        animateScoreDisplay(Math.floor(prev),Math.floor(gs.currentScore));
-        updateHUD();
-        var delay=result.lines>0?500:50;
-        setTimeout(function(){
-          // Use the endState already computed by placeBlock (post-refill check)
-          if(result.endState && result.endState.state==='gameover'){
-            setTimeout(function(){
-              var fs=Math.floor(gs.currentScore);
-              var isNewBest = BlockPuzzle.setModeHigh(gs.activeMode, fs);
-              var modeHigh = BlockPuzzle.getModeHigh(gs.activeMode);
-              showGameOver(fs, modeHigh, isNewBest);
-            },100);
-          }
-        },delay);
-      },
-      onCancel:function(){clearProj();renderTray();},
-      onProjectionChange:function(aR,aC,v,f){highlightProj(aR,aC,v,f);},
-      isValidFn:function(r,c,s){return BlockPuzzle.isValid(r,c,s);},
-      getFilledCells:function(s){return BlockPuzzle.getFilled(s);},
-    });
-
-    function onTrayPointerDown(e,idx){
-      var gs=BlockPuzzle.G;
-      if(gs.isGameOver)return;
-      if(gs.trayPieces[idx]===null)return;
-      var slot=document.getElementById('tray-slot-'+idx);
-      slot.classList.add('tray__slot--selected');
-      dragCtrl.start(e,idx,gs.trayPieces[idx],$grid,slot);
-    }
-
-    // ═══════════════════════════════════════════════════════════════
-    // GAME INIT
-    // ═══════════════════════════════════════════════════════════════
-    function startGame(mode){
-      BlockPuzzle.initMode(mode);
-      $modeIndicator.textContent = mode.toUpperCase();
-      $bestScore.textContent = BlockPuzzle.getModeHigh(mode);
-      $curScore.textContent = '0';
-      createGrid();renderGrid();renderTray();
-      showScreen('game');hideGameOver();
-    }
-
-    // ── Events ──
-    document.getElementById('btn-back').onclick=function(){
-      showScreen('menu');updateModeBestScores();
-    };
-    [0,1,2].forEach(function(i){
-      document.getElementById('tray-slot-'+i).addEventListener('pointerdown',function(e){onTrayPointerDown(e,i);});
-    });
-    document.getElementById('btn-go-menu').onclick=function(){
-      hideGameOver();showScreen('menu');updateModeBestScores();
-    };
-    document.getElementById('btn-go-retry').onclick=function(){
-      hideGameOver();startGame(ui.activeMode);
-    };
-    document.getElementById('screen-game').addEventListener('touchmove',function(e){e.preventDefault();},{passive:false});
-
-    // ── Init ──
-    updateModeBestScores();
-
-  }); // end onReady
-
-  }catch(e){
-    console.error('[BlockPuzzle] Init error:',e);
-    try{var m=document.getElementById('screen-menu');if(m)m.classList.add('screen--active');}catch(_){}
+    _prevGrid=prev;
   }
+
+  // ────────────────────────────────────────────────────────────
+  // OPTIMIZED TRAY RENDERER
+  // Builds DOM once per startGame; on subsequent renders only
+  // patches the color/visibility of pre-built block elements.
+  // ────────────────────────────────────────────────────────────
+  var _trayBuilt=[false,false,false]; // which slots have DOM built
+  var _trayBlocks=[null,null,null];   // array of block div refs per slot
+
+  function buildTraySlot(i,piece){
+    var slot=document.getElementById('tray-slot-'+i);
+    slot.innerHTML='';
+    _trayBlocks[i]=null;
+
+    if(piece===null){slot.classList.add('tray__slot--empty');return;}
+    slot.classList.remove('tray__slot--empty','tray__slot--selected');
+
+    var shape=piece.shapeMatrix;
+    var dims=BlockPuzzle.getDims(shape);
+    var rows=dims.rows,cols=dims.cols;
+    var trayCellPx=9,trayMaxPx=65;
+    var maxDim=Math.max(rows,cols);
+    var rawSize=maxDim*trayCellPx;
+    var scale=rawSize>trayMaxPx?trayMaxPx/rawSize:1;
+    scale=Math.max(0.4,Math.min(1,scale));
+
+    var filled=BlockPuzzle.getFilled(shape);
+    var gridCont=document.createElement('div');
+    gridCont.style.cssText='overflow:visible;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;transform:scale('+scale.toFixed(3)+');transform-origin:center center;';
+
+    var blocks=[];
+    var frag=document.createDocumentFragment();
+    for(var r=0;r<rows;r++){
+      var rowDiv=document.createElement('div');
+      rowDiv.style.cssText='display:flex;gap:1px;';
+      for(var c=0;c<cols;c++){
+        var isF=filled.some(function(fc){return fc[0]===r&&fc[1]===c;});
+        var block=document.createElement('div');
+        var baseStyle='width:'+trayCellPx+'px;height:'+trayCellPx+'px;border-radius:1px;';
+        if(isF){
+          block.style.cssText=baseStyle+'background:linear-gradient(135deg,'+piece.color+','+piece.color+'cc);box-shadow:inset 0 1px 1px rgba(255,255,255,.3),0 0 3px '+piece.color+'44;';
+        }else{
+          block.style.cssText=baseStyle+'background:transparent;';
+        }
+        block._isFilled=isF;
+        blocks.push(block);
+        rowDiv.appendChild(block);
+      }
+      frag.appendChild(rowDiv);
+    }
+    gridCont.appendChild(frag);
+
+    var preview=document.createElement('div');
+    preview.className='piece-preview';
+    preview.appendChild(gridCont);
+    slot.appendChild(preview);
+    _trayBlocks[i]={blocks:blocks,piece:piece};
+  }
+
+  function renderTray(){
+    var pieces=BlockPuzzle.G.trayPieces;
+    for(var i=0;i<3;i++){
+      var piece=pieces[i];
+      var slot=document.getElementById('tray-slot-'+i);
+      var built=_trayBlocks[i];
+
+      // If null -> empty
+      if(piece===null){
+        if(built!==null){
+          slot.innerHTML='';
+          _trayBlocks[i]=null;
+          slot.classList.add('tray__slot--empty');
+        }
+        continue;
+      }
+
+      // If same piece id and color, don't rebuild — just ensure not empty
+      if(built&&built.piece&&built.piece.id===piece.id&&built.piece.color===piece.color){
+        slot.classList.remove('tray__slot--empty','tray__slot--selected');
+        continue;
+      }
+
+      // New piece — build fresh
+      buildTraySlot(i,piece);
+    }
+  }
+
+  // Full tray rebuild (on game start)
+  function buildTrayFull(){
+    for(var i=0;i<3;i++){_trayBlocks[i]=null;}
+    renderTray();
+  }
+
+  // ── HUD ──
+  function updateHUD(){
+    var gs=BlockPuzzle.G;
+    $curScore.textContent=Math.floor(gs.currentScore);
+    var modeHigh=BlockPuzzle.getModeHigh(gs.activeMode);
+    if(gs.currentScore>modeHigh){
+      BlockPuzzle.setModeHigh(gs.activeMode,Math.floor(gs.currentScore));
+      $bestScore.textContent=Math.floor(gs.currentScore);
+    }
+  }
+
+  function animateScoreDisplay(from,to){
+    if(ui._scoreAnimating)return;
+    ui._scoreAnimating=true;
+    BlockPuzzle.AnimCtrl.animateScore(from,to,280,function(val){$curScore.textContent=val;});
+    setTimeout(function(){ui._scoreAnimating=false;},300);
+  }
+
+  function spawnComboPopup(text,row,col){
+    var gr=$grid.getBoundingClientRect(),wr=$wrapper.getBoundingClientRect();
+    var cs=gr.width/GRID;
+    var x=gr.left-wr.left+(col+0.5)*cs;
+    var y=gr.top-wr.top+row*cs;
+    BlockPuzzle.AnimCtrl.spawnComboPopup(text,$wrapper,x,y);
+  }
+
+  // ── Drag Controller ──
+  var dragCtrl=new BlockPuzzle.DragController({
+    onCommit:function(ti,gR,gC,piece){
+      clearProj();
+      var result=BlockPuzzle.placeBlock(gR,gC,piece.shapeMatrix,piece.color,ti);
+      var gs=BlockPuzzle.G;
+      if(result.lines>0){
+        var aR=0,aC=0,cnt=0;
+        result.rows.forEach(function(r){aR+=r;cnt++;});
+        result.cols.forEach(function(c){aC+=c;cnt++;});
+        if(cnt>0){aR/=cnt;aC/=cnt;}
+        var ct='+'+result.scoreGained;if(result.combo>1)ct+=' x'+result.combo+' Combo!';
+        spawnComboPopup(ct,aR,aC);
+        // Blast then render — grid render cleans up blast classes
+        BlockPuzzle.AnimCtrl.blastLines(result.rows,result.cols,$grid).then(function(){
+          // Clean up blast classes before rendering
+          var cells=$grid.children;
+          for(var i=0;i<cells.length;i++){cells[i].classList.remove('grid-cell--blast');cells[i].style.animationDelay='';}
+          _prevGrid=null; // force full repaint after blast
+          renderGrid();renderTray();
+        });
+      }else{
+        renderGrid();renderTray();
+      }
+      var prev=gs.currentScore-result.scoreGained;
+      animateScoreDisplay(Math.floor(prev),Math.floor(gs.currentScore));
+      updateHUD();
+      var delay=result.lines>0?420:50;
+      setTimeout(function(){
+        if(result.endState&&result.endState.state==='gameover'){
+          setTimeout(function(){
+            var fs=Math.floor(gs.currentScore);
+            var isNewBest=BlockPuzzle.setModeHigh(gs.activeMode,fs);
+            var modeHigh=BlockPuzzle.getModeHigh(gs.activeMode);
+            showGameOver(fs,modeHigh,isNewBest);
+          },100);
+        }
+      },delay);
+    },
+    onCancel:function(){clearProj();renderTray();},
+    onProjectionChange:function(aR,aC,v,f){highlightProj(aR,aC,v,f);},
+    isValidFn:function(r,c,s){return BlockPuzzle.isValid(r,c,s);},
+    getFilledCells:function(s){return BlockPuzzle.getFilled(s);},
+  });
+
+  function onTrayPointerDown(e,idx){
+    var gs=BlockPuzzle.G;
+    if(gs.isGameOver)return;
+    if(gs.trayPieces[idx]===null)return;
+    var slot=document.getElementById('tray-slot-'+idx);
+    slot.classList.add('tray__slot--selected');
+    dragCtrl.start(e,idx,gs.trayPieces[idx],$grid,slot);
+  }
+
+  // ── Game Init ──
+  function startGame(mode){
+    BlockPuzzle.initMode(mode);
+    $modeIndicator.textContent=mode.toUpperCase();
+    $bestScore.textContent=BlockPuzzle.getModeHigh(mode);
+    $curScore.textContent='0';
+    _prevGrid=null; // reset diff state
+    createGrid();
+    renderGrid();
+    buildTrayFull();
+    showScreen('game');
+    hideGameOver();
+  }
+
+  // ── Events ──
+  document.getElementById('btn-back').onclick=function(){showScreen('menu');updateModeBestScores();};
+  [0,1,2].forEach(function(i){
+    document.getElementById('tray-slot-'+i).addEventListener('pointerdown',function(e){onTrayPointerDown(e,i);});
+  });
+  document.getElementById('btn-go-menu').onclick=function(){hideGameOver();showScreen('menu');updateModeBestScores();};
+  document.getElementById('btn-go-retry').onclick=function(){hideGameOver();startGame(ui.activeMode);};
+  document.getElementById('screen-game').addEventListener('touchmove',function(e){e.preventDefault();},{passive:false});
+
+  updateModeBestScores();
+
+}); // end onReady
+
+}catch(e){
+  console.error('[BlockPuzzle] Init error:',e);
+  try{var m=document.getElementById('screen-menu');if(m)m.classList.add('screen--active');}catch(_){}
+}
 
 })();
 </script>

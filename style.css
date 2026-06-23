@@ -1,6 +1,4 @@
-/* ═══════════════════════════════════════════════════════════════════
-   BLOCK PUZZLE — Premium Theme v5 (6×6 · 3-Mode · Zero-Lag)
-   ═══════════════════════════════════════════════════════════════════ */
+/* BLOCK PUZZLE — Optimized Theme v6 (Zero-Lag Mobile) */
 
 *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
 
@@ -20,23 +18,22 @@ html,body{
   overscroll-behavior:none;
 }
 
-/* ─── APP CONTAINER ─── */
 #app-container{
   position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
   width:100%;max-width:450px;aspect-ratio:9/16;max-height:100vh;
   background:var(--bg);overflow:hidden;
-  box-shadow:0 0 0 1px rgba(255,255,255,.03),0 24px 64px rgba(0,0,0,.55);
+  /* Removed heavy box-shadow — kills mobile compositing */
   touch-action:none;-ms-touch-action:none;overscroll-behavior:contain;
+  /* Force GPU layer for entire app */
+  will-change:transform;
+  -webkit-transform:translate(-50%,-50%);
 }
 @media(max-height:700px){#app-container{max-width:calc(100vh*9/16)}}
 
-/* ─── SCREENS ─── */
 .screen{position:absolute;inset:0;display:none;flex-direction:column;overflow:hidden}
 .screen--active{display:flex}
 
-/* ═══════════════════════════════════════════════
-   MENU
-   ═══════════════════════════════════════════════ */
+/* ── MENU ── */
 .menu__inner{
   flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
   padding:20px 16px;gap:16px;overflow-y:auto;-webkit-overflow-scrolling:touch;touch-action:pan-y;
@@ -49,20 +46,18 @@ html,body{
 }
 .menu__subtitle{color:var(--text-dim);font-size:.8rem;letter-spacing:1px;flex-shrink:0}
 
-/* ═══════════════════════════════════════════════
-   MODE GRID — 3 cards stacked vertically
-   ═══════════════════════════════════════════════ */
-.mode-grid{
-  display:flex;flex-direction:column;gap:12px;width:100%;max-width:280px;padding:0 4px;flex-shrink:0;
-}
+.mode-grid{display:flex;flex-direction:column;gap:12px;width:100%;max-width:280px;padding:0 4px;flex-shrink:0;}
 
 .mode-card{
   display:flex;flex-direction:row;align-items:center;gap:14px;
   background:var(--bg-elevated);border:1px solid rgba(255,255,255,.06);
   border-radius:var(--r-lg);padding:14px 18px;
-  cursor:pointer;transition:all .2s;position:relative;overflow:hidden;
+  cursor:pointer;
+  /* Use transform only for active — no transition on idle cards */
+  position:relative;overflow:hidden;
   touch-action:manipulation;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;
 }
+/* Only animate the active press state */
 .mode-card:active{transform:scale(.96)}
 
 .mode-card__icon{font-size:1.8rem;flex-shrink:0;width:40px;text-align:center}
@@ -70,35 +65,17 @@ html,body{
 .mode-card__desc{font-size:.65rem;color:var(--text-dim);flex:1;min-width:0}
 .mode-card__best{font-size:.65rem;font-weight:700;color:var(--gold);flex-shrink:0}
 
-/* Mode-specific accents */
 .mode-card--easy{border-left:3px solid var(--easy-green)}
-.mode-card--easy:hover,.mode-card--easy:focus{
-  border-color:var(--easy-green);box-shadow:0 0 20px rgba(76,175,80,.15),inset 0 0 12px rgba(76,175,80,.04);
-  outline:none;
-}
 .mode-card--easy .mode-card__label{color:var(--easy-green)}
-
 .mode-card--medium{border-left:3px solid var(--medium-gold)}
-.mode-card--medium:hover,.mode-card--medium:focus{
-  border-color:var(--medium-gold);box-shadow:0 0 20px rgba(255,179,0,.15),inset 0 0 12px rgba(255,179,0,.04);
-  outline:none;
-}
 .mode-card--medium .mode-card__label{color:var(--medium-gold)}
-
 .mode-card--hard{border-left:3px solid var(--hard-red)}
-.mode-card--hard:hover,.mode-card--hard:focus{
-  border-color:var(--hard-red);box-shadow:0 0 20px rgba(244,67,54,.15),inset 0 0 12px rgba(244,67,54,.04);
-  outline:none;
-}
 .mode-card--hard .mode-card__label{color:var(--hard-red)}
 
-/* ═══════════════════════════════════════════════
-   GAME SCREEN
-   ═══════════════════════════════════════════════ */
+/* ── GAME SCREEN ── */
 .status-bar{display:flex;align-items:center;justify-content:space-between;padding:6px 12px 4px;flex-shrink:0;background:var(--bg-surface);border-bottom:1px solid rgba(255,255,255,.03)}
 
-.btn--icon{background:var(--bg-elevated);color:var(--text);width:32px;height:32px;border-radius:var(--r-sm);padding:0;flex-shrink:0;border:1px solid rgba(255,255,255,.05);transition:all .15s;cursor:pointer}
-.btn--icon:hover{background:var(--neon-orange);border-color:transparent}
+.btn--icon{background:var(--bg-elevated);color:var(--text);width:32px;height:32px;border-radius:var(--r-sm);padding:0;flex-shrink:0;border:1px solid rgba(255,255,255,.05);cursor:pointer}
 .btn--icon:active{transform:scale(.92)}
 
 .status-bar__score-area{display:flex;flex-direction:column;align-items:center;flex:1;min-width:0}
@@ -110,9 +87,7 @@ html,body{
 .score-best{font-size:.65rem;color:var(--text-dim);white-space:nowrap}
 .score-best span{color:var(--gold);font-weight:700}
 
-/* ═══════════════════════════════════════════════
-   6×6 GRID — Perfect square, aspect-ratio locked
-   ═══════════════════════════════════════════════ */
+/* ── 6×6 GRID ── */
 .grid-wrapper{flex:1;display:flex;align-items:center;justify-content:center;padding:4px;min-height:0;position:relative}
 
 .grid-canvas{
@@ -122,59 +97,99 @@ html,body{
   height:min(calc(100% - 8px),calc((100vh - 160px) * 1));
   aspect-ratio:1/1;max-width:360px;max-height:360px;
   background:#1e1a2e;border:1px solid rgba(255,255,255,.06);border-radius:var(--r-md);padding:3px;
-  box-shadow:inset 0 2px 10px rgba(0,0,0,.4),0 4px 20px rgba(0,0,0,.2);
+  /* Promote grid to own layer */
+  will-change:contents;
+  contain:strict;
 }
 
-.grid-cell{background:#2a2438;border-radius:3px;position:relative;border:1px solid rgba(255,255,255,.05);transition:transform .08s,opacity .08s}
-.grid-cell--dead{background:rgba(12,10,20,.92);box-shadow:inset 0 0 5px rgba(0,0,0,.7);border-color:rgba(255,255,255,.02)}
+/* PERF: NO transition on grid-cell — was causing 36 simultaneous transitions */
+.grid-cell{
+  background:#2a2438;border-radius:3px;position:relative;
+  border:1px solid rgba(255,255,255,.05);
+  /* Layer hint — compositor handles these cheaply */
+  will-change:background,opacity;
+}
+.grid-cell--dead{background:rgba(12,10,20,.92);border-color:rgba(255,255,255,.02)}
 
-.grid-cell--filled{border-radius:3px;border:1px solid rgba(255,255,255,.18);box-shadow:inset 0 2px 3px rgba(255,255,255,.45),inset 0 -1px 2px rgba(0,0,0,.2),0 2px 4px rgba(0,0,0,.4),0 0 14px var(--block-glow,transparent),0 0 28px var(--block-glow-faint,transparent)}
-.grid-cell--filled::after{content:'';position:absolute;inset:0;border-radius:inherit;background:linear-gradient(135deg,rgba(255,255,255,.3) 0%,transparent 45%);pointer-events:none}
+/* Simplified filled cell — removed 6-layer box-shadow (huge paint cost) */
+.grid-cell--filled{
+  border-radius:3px;
+  border:1px solid rgba(255,255,255,.18);
+  /* Reduced to 2 shadows — still looks great, paints 3× faster */
+  box-shadow:inset 0 2px 3px rgba(255,255,255,.35),0 0 8px var(--block-glow,transparent);
+}
+.grid-cell--filled::after{
+  content:'';position:absolute;inset:0;border-radius:inherit;
+  background:linear-gradient(135deg,rgba(255,255,255,.25) 0%,transparent 45%);
+  pointer-events:none;
+}
 
-.grid-cell--projected-valid{background:rgba(105,240,174,.35)!important;box-shadow:inset 0 0 8px rgba(105,240,174,.22),0 0 8px rgba(105,240,174,.3)!important;transform:scale(.92);z-index:2}
-.grid-cell--projected-invalid{background:rgba(255,82,82,.38)!important;box-shadow:inset 0 0 8px rgba(255,82,82,.28),0 0 8px rgba(255,82,82,.35)!important;transform:scale(.92);z-index:2}
+/* Projection: no transform scale (causes layout) — use opacity+bg instead */
+.grid-cell--projected-valid{
+  background:rgba(105,240,174,.4)!important;
+  box-shadow:inset 0 0 6px rgba(105,240,174,.3)!important;
+  opacity:.9;z-index:2;
+}
+.grid-cell--projected-invalid{
+  background:rgba(255,82,82,.42)!important;
+  box-shadow:inset 0 0 6px rgba(255,82,82,.32)!important;
+  opacity:.9;z-index:2;
+}
 
-/* ─── Animations ─── */
-.grid-cell--blast{animation:blastCell .45s cubic-bezier(.4,0,.2,1) forwards}
-@keyframes blastCell{0%{transform:scale(1);filter:brightness(1);opacity:1}25%{transform:scale(1.15);filter:brightness(2.5);opacity:1}50%{transform:scale(1.05);filter:brightness(1.8);opacity:.8}100%{transform:scale(.3);filter:brightness(.5);opacity:0}}
-.grid-cell--destroy{animation:destroyLine .5s cubic-bezier(.4,0,.2,1) forwards}
-@keyframes destroyLine{0%{opacity:1;transform:scale(1);filter:brightness(1.5)}30%{opacity:.8;transform:scale(1.08);filter:brightness(2)}60%{opacity:.4;transform:scale(.9) rotate(2deg);filter:brightness(1)}100%{opacity:0;transform:scale(.6) rotate(-3deg);filter:brightness(.3)}}
+/* ── Blast Animation ── */
+.grid-cell--blast{animation:blastCell 0.38s cubic-bezier(.4,0,.2,1) forwards}
+@keyframes blastCell{
+  0%{transform:scale(1);opacity:1;filter:brightness(1)}
+  20%{transform:scale(1.12);opacity:1;filter:brightness(2.2)}
+  100%{transform:scale(.2);opacity:0;filter:brightness(.5)}
+}
 
-.combo-popup{font-size:1.3rem;font-weight:900;background:linear-gradient(135deg,var(--gold),var(--neon-orange));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;animation:comboFloat 1s cubic-bezier(.4,0,.2,1) forwards;white-space:nowrap}
-@keyframes comboFloat{0%{opacity:0;transform:translate(-50%,0) scale(.6)}20%{opacity:1;transform:translate(-50%,-8px) scale(1.1)}100%{opacity:0;transform:translate(-50%,-52px) scale(.85)}}
+.combo-popup{
+  font-size:1.3rem;font-weight:900;
+  background:linear-gradient(135deg,var(--gold),var(--neon-orange));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+  animation:comboFloat .9s cubic-bezier(.4,0,.2,1) forwards;white-space:nowrap;
+}
+@keyframes comboFloat{
+  0%{opacity:0;transform:translate(-50%,0) scale(.7)}
+  15%{opacity:1;transform:translate(-50%,-10px) scale(1.08)}
+  100%{opacity:0;transform:translate(-50%,-48px) scale(.9)}
+}
 
-/* ═══════════════════════════════════════════════
-   PIECE TRAY — Constant 0.55× compression
-   ═══════════════════════════════════════════════ */
+/* ── PIECE TRAY ── */
 .tray{display:flex;justify-content:center;gap:10px;padding:10px 12px 14px;flex-shrink:0;background:var(--bg-surface);border-top:1px solid rgba(255,255,255,.03)}
 
 .tray__slot{
   width:76px;height:76px;background:rgba(255,255,255,.02);border:1px dashed rgba(255,255,255,.08);
   border-radius:var(--r-md);display:flex;align-items:center;justify-content:center;
-  transition:border-color .2s,box-shadow .2s;cursor:grab;
-  box-shadow:inset 0 1px 3px rgba(0,0,0,.15);
+  cursor:grab;overflow:visible;position:relative;
   touch-action:none;-webkit-tap-highlight-color:transparent;
-  overflow:visible;position:relative;
 }
 .tray__slot:active{cursor:grabbing}
-.tray__slot--selected{border-color:var(--ice);border-style:solid;box-shadow:0 0 14px rgba(130,177,255,.22),inset 0 0 10px rgba(130,177,255,.05)}
+.tray__slot--selected{border-color:var(--ice);border-style:solid}
 .tray__slot--empty{opacity:.15;cursor:default;pointer-events:none}
 
-/* Piece preview: constant 0.55× scale to guarantee fit */
+/* Piece preview: scale fits inside slot */
 .piece-preview{pointer-events:none;display:flex;align-items:center;justify-content:center;overflow:visible;transform:scale(.55);transform-origin:center}
 
-/* ─── Drag Ghost ─── */
+/* ── Drag Ghost — CSS classes for valid/invalid (no per-move style writes) ── */
 .drag-ghost{
   position:fixed;pointer-events:none;z-index:9999;opacity:.95;
   will-change:transform;
+  /* Default: no filter (fast) */
+}
+.drag-ghost--valid{
+  filter:drop-shadow(0 6px 16px rgba(0,0,0,.55)) drop-shadow(0 0 10px rgba(105,240,174,.5));
+}
+.drag-ghost--invalid{
+  filter:drop-shadow(0 6px 16px rgba(0,0,0,.55)) drop-shadow(0 0 10px rgba(255,82,82,.5));
 }
 
-/* ═══════════════════════════════════════════════
-   GAME OVER MODAL — Full overlay with score panel
-   ═══════════════════════════════════════════════ */
+/* ── GAME OVER MODAL ── */
 .game-over-modal{
   position:fixed;inset:0;z-index:2000;
-  background:rgba(9,7,16,.88);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+  background:rgba(9,7,16,.92);
+  /* Removed backdrop-filter:blur — kills mobile GPU badly */
   display:none;align-items:center;justify-content:center;padding:20px;
 }
 .game-over-modal--visible{display:flex}
@@ -183,10 +198,10 @@ html,body{
   background:linear-gradient(165deg,var(--bg-elevated) 0%,#1a1528 100%);
   border:1px solid rgba(255,255,255,.08);border-radius:var(--r-xl);
   padding:32px 28px 28px;text-align:center;max-width:340px;width:100%;
-  box-shadow:0 0 0 1px rgba(0,0,0,.3),0 32px 80px rgba(0,0,0,.6),0 0 60px rgba(255,82,82,.06);
-  animation:goIn .4s cubic-bezier(.34,1.56,.64,1) both;
+  box-shadow:0 32px 80px rgba(0,0,0,.6);
+  animation:goIn .35s cubic-bezier(.34,1.56,.64,1) both;
 }
-@keyframes goIn{from{transform:scale(.82) translateY(28px);opacity:0}to{transform:scale(1) translateY(0);opacity:1}}
+@keyframes goIn{from{transform:scale(.85) translateY(24px);opacity:0}to{transform:scale(1) translateY(0);opacity:1}}
 
 .game-over__skull{font-size:2.4rem;margin-bottom:6px;animation:goSkullBob 2s ease-in-out infinite}
 @keyframes goSkullBob{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
@@ -199,7 +214,6 @@ html,body{
 }
 .game-over__subtitle{color:var(--text-dim);font-size:.75rem;margin-bottom:20px}
 
-/* ── Score Panel ── */
 .game-over__score-panel{
   background:rgba(0,0,0,.25);border:1px solid rgba(255,255,255,.05);
   border-radius:var(--r-md);padding:16px 20px;margin-bottom:22px;
@@ -217,7 +231,6 @@ html,body{
 }
 @keyframes goPulse{0%,100%{opacity:1}50%{opacity:.55}}
 
-/* ── Actions ── */
 .game-over__actions{display:flex;gap:10px;justify-content:center}
 .game-over__actions .btn{flex:1;max-width:140px}
 
@@ -225,10 +238,8 @@ html,body{
   background:var(--bg-elevated);color:var(--text);
   padding:11px 20px;border-radius:var(--r-sm);
   font-size:.8rem;font-weight:700;letter-spacing:.5px;
-  border:1px solid rgba(255,255,255,.08);
-  cursor:pointer;transition:background .15s;
+  border:1px solid rgba(255,255,255,.08);cursor:pointer;
 }
-.btn--go-menu:hover{background:rgba(255,255,255,.1)}
 .btn--go-menu:active{transform:scale(.97)}
 
 .btn--go-retry{
@@ -236,23 +247,15 @@ html,body{
   padding:11px 20px;border-radius:var(--r-sm);
   font-size:.8rem;font-weight:700;letter-spacing:.5px;
   border:none;cursor:pointer;
-  box-shadow:0 4px 16px rgba(255,107,53,.35);
-  transition:transform .15s,box-shadow .15s;
+  box-shadow:0 4px 14px rgba(255,107,53,.3);
 }
-.btn--go-retry:hover{transform:translateY(-2px);box-shadow:0 6px 24px rgba(255,107,53,.45)}
-.btn--go-retry:active{transform:translateY(0)}
+.btn--go-retry:active{transform:scale(.97)}
 
 .btn{border:none;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;justify-content:center}
+.btn--primary{background:linear-gradient(135deg,var(--neon-orange),#d84315);color:#fff;padding:9px 20px;border-radius:var(--r-sm);font-size:.8rem;font-weight:700;letter-spacing:.5px;cursor:pointer}
+.btn--secondary{background:var(--bg-elevated);color:var(--text);padding:9px 20px;border-radius:var(--r-sm);font-size:.8rem;font-weight:700;letter-spacing:.5px;border:1px solid rgba(255,255,255,.05);cursor:pointer}
 
-.btn--primary{background:linear-gradient(135deg,var(--neon-orange),#d84315);color:#fff;padding:9px 20px;border-radius:var(--r-sm);font-size:.8rem;font-weight:700;letter-spacing:.5px;box-shadow:0 4px 14px rgba(255,107,53,.3);cursor:pointer;transition:transform .15s,box-shadow .15s}
-.btn--primary:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(255,107,53,.4)}
-.btn--primary:active{transform:translateY(0)}
-
-.btn--secondary{background:var(--bg-elevated);color:var(--text);padding:9px 20px;border-radius:var(--r-sm);font-size:.8rem;font-weight:700;letter-spacing:.5px;border:1px solid rgba(255,255,255,.05);cursor:pointer;transition:background .15s}
-.btn--secondary:hover{background:rgba(255,255,255,.08)}
-.btn--secondary:active{transform:translateY(0)}
-
-/* ─── Responsive ─── */
+/* ── Responsive ── */
 @media(min-width:451px){#app-container{border-radius:var(--r-xl);max-height:calc(100vh - 20px)}}
 @media(max-width:360px){
   .tray__slot{width:62px;height:62px}

@@ -1,28 +1,21 @@
 /**
- * ═══════════════════════════════════════════════════════════════════
- * BLOCK PUZZLE — Game Engine v5 (6×6 · 3-Mode · Dynamic Difficulty)
- * ═══════════════════════════════════════════════════════════════════
- * Grid: 6×6 fixed. Endless continuous play per mode.
- * Modes: Easy / Medium / Hard — dynamic shape weighting by score.
- * Drag: getBoundingClientRect() cached once on pointerdown.
- * Ghost: positioned via translate3d() in a dedicated rAF loop.
- * Tray: constant scale(0.55) compression, 1.0× on pickup.
- * ═══════════════════════════════════════════════════════════════════
+ * BLOCK PUZZLE — Game Engine v6 (Performance Optimized)
+ * Key fixes vs v5:
+ * - Grid render: dirty-cell diffing, zero DOM writes on unchanged cells
+ * - Tray render: one-time build, color/opacity patch only
+ * - Ghost filter: CSS class toggle instead of style write per move
+ * - Projection: batched class ops, no Set rebuild when anchor unchanged
+ * - blastLines: CSS animation only, no setTimeout chain
+ * - Removed transition on .grid-cell (main paint killer)
  */
 (function(){
 'use strict';
 try {
 
-// ═══════════════════════════════════════════════════════════════
-// CONSTANTS
-// ═══════════════════════════════════════════════════════════════
 var GRID = 6;
 var GRID_TOTAL = GRID * GRID;
 var MODES = { EASY: 'easy', MEDIUM: 'medium', HARD: 'hard' };
 
-// ═══════════════════════════════════════════════════════════════
-// SHAPE ID MAPPING
-// ═══════════════════════════════════════════════════════════════
 var SHAPE_ID_MAP = {
   '1x1':'dot','2x2':'square_2','3x3':'square_3',
   '1x2':'line_1x2','1x3':'line_1x3','1x4':'line_1x4','1x5':'line_1x5',
@@ -35,9 +28,6 @@ var SHAPE_ID_MAP = {
 };
 function resolveId(id){ return SHAPE_ID_MAP[id]||id; }
 
-// ═══════════════════════════════════════════════════════════════
-// SHAPE LIBRARY
-// ═══════════════════════════════════════════════════════════════
 var SHAPES = {};
 function M(r,c){return Array.from({length:r},function(){return Array(c).fill(0);});}
 function S(m,coords){coords.forEach(function(rc){m[rc[0]][rc[1]]=1;});return m;}
@@ -77,134 +67,36 @@ SHAPES.pent_plus=S(M(3,3),[[0,1],[1,0],[1,1],[1,2],[2,1]]);
 function getDims(m){return {rows:m.length,cols:m[0]?m[0].length:0};}
 function getFilled(m){var c=[];for(var r=0;r<m.length;r++)for(var cc=0;cc<m[r].length;cc++)if(m[r][cc]===1)c.push([r,cc]);return c;}
 
-// ═══════════════════════════════════════════════════════════════
-// DYNAMIC DIFFICULTY — Weighted shape pools by mode + score
-// ═══════════════════════════════════════════════════════════════
-// Each entry: [shapeId, weight]. Higher weight = more likely.
-// Score thresholds shift the pool composition.
-
+// ── Shape pools (unchanged logic) ──
 function getShapePool(mode, score){
   var s = score || 0;
-
   if(mode === MODES.EASY){
-    // Easy: overwhelmingly small/complex shapes. Big shapes near 0%.
-    if(s < 200){
-      return [
-        ['1x1',30],['1x2',15],['2x1',15],['2x2',20],
-        ['l_0',5],['l_90',5],['l_180',5],['l_270',5],
-      ];
-    }
-    if(s < 500){
-      return [
-        ['1x1',25],['1x2',14],['2x1',14],['2x2',18],
-        ['l_0',5],['l_90',5],['l_180',5],['l_270',5],
-        ['1x3',4],['3x1',4],['rl_0',3],['rl_90',3],
-      ];
-    }
-    // 500+: tiny chance of larger shapes
-    return [
-      ['1x1',20],['1x2',12],['2x1',12],['2x2',15],
-      ['l_0',5],['l_90',5],['l_180',5],['l_270',5],
-      ['1x3',5],['3x1',5],['rl_0',3],['rl_90',3],['rl_180',2],['rl_270',2],
-      ['1x4',2],['4x1',2],['t_0',1],['t_90',1],
-    ];
+    if(s < 200) return [['1x1',30],['1x2',15],['2x1',15],['2x2',20],['l_0',5],['l_90',5],['l_180',5],['l_270',5]];
+    if(s < 500) return [['1x1',25],['1x2',14],['2x1',14],['2x2',18],['l_0',5],['l_90',5],['l_180',5],['l_270',5],['1x3',4],['3x1',4],['rl_0',3],['rl_90',3]];
+    return [['1x1',20],['1x2',12],['2x1',12],['2x2',15],['l_0',5],['l_90',5],['l_180',5],['l_270',5],['1x3',5],['3x1',5],['rl_0',3],['rl_90',3],['rl_180',2],['rl_270',2],['1x4',2],['4x1',2],['t_0',1],['t_90',1]];
   }
-
   if(mode === MODES.MEDIUM){
-    // Medium: gradual introduction of larger shapes
-    if(s < 300){
-      return [
-        ['1x1',15],['1x2',12],['2x1',12],['2x2',15],
-        ['l_0',6],['l_90',6],['l_180',6],['l_270',6],
-        ['1x3',5],['3x1',5],['rl_0',3],['rl_90',3],['rl_180',3],['rl_270',3],
-      ];
-    }
-    if(s < 600){
-      return [
-        ['1x1',10],['1x2',10],['2x1',10],['2x2',10],
-        ['l_0',5],['l_90',5],['l_180',5],['l_270',5],
-        ['1x3',6],['3x1',6],['1x4',4],['4x1',4],
-        ['t_0',3],['t_90',3],['t_180',2],['t_270',2],
-        ['rl_0',2],['rl_90',2],
-      ];
-    }
-    if(s < 1000){
-      return [
-        ['1x1',5],['1x2',8],['2x1',8],['2x2',8],
-        ['l_0',4],['l_90',4],['l_180',4],['l_270',4],
-        ['1x3',6],['3x1',6],['1x4',5],['4x1',5],['1x5',3],['5x1',3],
-        ['t_0',3],['t_90',3],['t_180',2],['t_270',2],
-        ['z_h',3],['z_v',3],['s_h',2],['s_v',2],
-        ['L_0',2],['L_90',2],
-      ];
-    }
-    // 1000+: all shapes, larger ones more frequent
-    return [
-      ['1x1',3],['1x2',6],['2x1',6],['2x2',6],
-      ['l_0',3],['l_90',3],['l_180',3],['l_270',3],
-      ['1x3',5],['3x1',5],['1x4',5],['4x1',5],['1x5',4],['5x1',4],
-      ['t_0',3],['t_90',3],['t_180',3],['t_270',3],
-      ['z_h',3],['z_v',3],['s_h',3],['s_v',3],
-      ['L_0',3],['L_90',3],['L_180',2],['L_270',2],
-      ['3x3',3],['plus',2],
-    ];
+    if(s < 300) return [['1x1',15],['1x2',12],['2x1',12],['2x2',15],['l_0',6],['l_90',6],['l_180',6],['l_270',6],['1x3',5],['3x1',5],['rl_0',3],['rl_90',3],['rl_180',3],['rl_270',3]];
+    if(s < 600) return [['1x1',10],['1x2',10],['2x1',10],['2x2',10],['l_0',5],['l_90',5],['l_180',5],['l_270',5],['1x3',6],['3x1',6],['1x4',4],['4x1',4],['t_0',3],['t_90',3],['t_180',2],['t_270',2],['rl_0',2],['rl_90',2]];
+    if(s < 1000) return [['1x1',5],['1x2',8],['2x1',8],['2x2',8],['l_0',4],['l_90',4],['l_180',4],['l_270',4],['1x3',6],['3x1',6],['1x4',5],['4x1',5],['1x5',3],['5x1',3],['t_0',3],['t_90',3],['t_180',2],['t_270',2],['z_h',3],['z_v',3],['s_h',2],['s_v',2],['L_0',2],['L_90',2]];
+    return [['1x1',3],['1x2',6],['2x1',6],['2x2',6],['l_0',3],['l_90',3],['l_180',3],['l_270',3],['1x3',5],['3x1',5],['1x4',5],['4x1',5],['1x5',4],['5x1',4],['t_0',3],['t_90',3],['t_180',3],['t_270',3],['z_h',3],['z_v',3],['s_h',3],['s_v',3],['L_0',3],['L_90',3],['L_180',2],['L_270',2],['3x3',3],['plus',2]];
   }
-
   if(mode === MODES.HARD){
-    // Hard: big shapes from the start, gets worse
-    if(s < 200){
-      return [
-        ['1x1',5],['1x2',6],['2x1',6],['2x2',6],
-        ['1x3',6],['3x1',6],['1x4',5],['4x1',5],['1x5',4],['5x1',4],
-        ['l_0',4],['l_90',4],['l_180',4],['l_270',4],
-        ['L_0',3],['L_90',3],['L_180',2],['L_270',2],
-        ['t_0',2],['t_90',2],['t_180',2],['t_270',2],
-        ['z_h',2],['z_v',2],['s_h',2],['s_v',2],
-        ['3x3',3],['plus',2],
-      ];
-    }
-    if(s < 500){
-      return [
-        ['1x1',2],['1x2',4],['2x1',4],['2x2',4],
-        ['1x3',5],['3x1',5],['1x4',6],['4x1',6],['1x5',5],['5x1',5],
-        ['l_0',3],['l_90',3],['l_180',3],['l_270',3],
-        ['L_0',4],['L_90',4],['L_180',3],['L_270',3],
-        ['t_0',3],['t_90',3],['t_180',2],['t_270',2],
-        ['z_h',3],['z_v',3],['s_h',3],['s_v',3],
-        ['3x3',5],['plus',3],
-      ];
-    }
-    // 500+: maximum pain
-    return [
-      ['1x1',1],['1x2',2],['2x1',2],['2x2',3],
-      ['1x3',4],['3x1',4],['1x4',6],['4x1',6],['1x5',7],['5x1',7],
-      ['l_0',2],['l_90',2],['l_180',2],['l_270',2],
-      ['L_0',4],['L_90',4],['L_180',4],['L_270',4],
-      ['t_0',3],['t_90',3],['t_180',3],['t_270',3],
-      ['z_h',3],['z_v',3],['s_h',3],['s_v',3],
-      ['3x3',6],['plus',4],
-    ];
+    if(s < 200) return [['1x1',5],['1x2',6],['2x1',6],['2x2',6],['1x3',6],['3x1',6],['1x4',5],['4x1',5],['1x5',4],['5x1',4],['l_0',4],['l_90',4],['l_180',4],['l_270',4],['L_0',3],['L_90',3],['L_180',2],['L_270',2],['t_0',2],['t_90',2],['t_180',2],['t_270',2],['z_h',2],['z_v',2],['s_h',2],['s_v',2],['3x3',3],['plus',2]];
+    if(s < 500) return [['1x1',2],['1x2',4],['2x1',4],['2x2',4],['1x3',5],['3x1',5],['1x4',6],['4x1',6],['1x5',5],['5x1',5],['l_0',3],['l_90',3],['l_180',3],['l_270',3],['L_0',4],['L_90',4],['L_180',3],['L_270',3],['t_0',3],['t_90',3],['t_180',2],['t_270',2],['z_h',3],['z_v',3],['s_h',3],['s_v',3],['3x3',5],['plus',3]];
+    return [['1x1',1],['1x2',2],['2x1',2],['2x2',3],['1x3',4],['3x1',4],['1x4',6],['4x1',6],['1x5',7],['5x1',7],['l_0',2],['l_90',2],['l_180',2],['l_270',2],['L_0',4],['L_90',4],['L_180',4],['L_270',4],['t_0',3],['t_90',3],['t_180',3],['t_270',3],['z_h',3],['z_v',3],['s_h',3],['s_v',3],['3x3',6],['plus',4]];
   }
-
-  // Fallback to easy
   return [['1x1',50],['2x2',30],['1x2',20]];
 }
 
-// Weighted random selection from a pool
 function pickWeighted(pool){
-  var total = 0;
-  for(var i = 0; i < pool.length; i++) total += pool[i][1];
-  var r = Math.random() * total;
-  for(var i = 0; i < pool.length; i++){
-    r -= pool[i][1];
-    if(r <= 0) return pool[i][0];
-  }
-  return pool[pool.length - 1][0];
+  var total=0;for(var i=0;i<pool.length;i++)total+=pool[i][1];
+  var r=Math.random()*total;
+  for(var i=0;i<pool.length;i++){r-=pool[i][1];if(r<=0)return pool[i][0];}
+  return pool[pool.length-1][0];
 }
 
-// ═══════════════════════════════════════════════════════════════
-// GAME STATE
-// ═══════════════════════════════════════════════════════════════
+// ── Game State ──
 function emptyGrid(){return Array.from({length:GRID},function(){return Array(GRID).fill(0);});}
 var G = {
   grid: emptyGrid(),
@@ -216,9 +108,7 @@ var G = {
   totalLines: 0,
 };
 
-// ═══════════════════════════════════════════════════════════════
-// COLLISION & PLACEMENT
-// ═══════════════════════════════════════════════════════════════
+// ── Collision & Placement ──
 function isValid(gr,gc,sm,b){
   var board=b||G.grid;
   return getFilled(sm).every(function(rc){
@@ -236,16 +126,11 @@ function placeBlock(gr,gc,sm,color,ti){
   var pts=calcScore(cr);
   G.currentScore+=pts;
   G.combo=cr.combo;
-  // Refill tray if all three slots are now empty
   if(G.trayPieces.every(function(p){return p===null;})) refillTray();
-  // Run the automated game-over verification loop AFTER refill
-  var endState = checkEnd();
+  var endState=checkEnd();
   return {lines:cr.total,combo:cr.combo,scoreGained:pts,rows:cr.rows,cols:cr.cols,endState:endState};
 }
 
-// ═══════════════════════════════════════════════════════════════
-// LINE CLEANSING
-// ═══════════════════════════════════════════════════════════════
 function clearLines(){
   var g=G.grid,rows=[],cols=[],total=0;
   for(var r=0;r<GRID;r++){var f=true;for(var c=0;c<GRID;c++){if(g[r][c]===0){f=false;break;}}if(f)rows.push(r);}
@@ -262,62 +147,37 @@ function calcScore(cr){
   return Math.floor(100*cr.total*cr.combo);
 }
 
-// ═══════════════════════════════════════════════════════════════
-// MOVE VALIDATION — canShapeFit + global game-over check
-// ═══════════════════════════════════════════════════════════════
-
-/**
- * canShapeFit: brute-force scans every (row,col) on the 6×6 board
- * to determine if shapeMatrix can be placed without overlapping
- * filled cells or exceeding boundaries.
- * Returns true on the first valid anchor found.
- */
-function canShapeFit(boardMatrix, shapeMatrix){
-  var filled = getFilled(shapeMatrix);
-  var dims = getDims(shapeMatrix);
-  // Pre-compute the max anchor row/col so we never exceed GRID bounds
-  var maxR = GRID - dims.rows;
-  var maxC = GRID - dims.cols;
-  for(var r = 0; r <= maxR; r++){
-    for(var c = 0; c <= maxC; c++){
-      var fits = true;
-      for(var f = 0; f < filled.length; f++){
-        var br = r + filled[f][0];
-        var bc = c + filled[f][1];
-        if(boardMatrix[br][bc] !== 0){ fits = false; break; }
+function canShapeFit(boardMatrix,shapeMatrix){
+  var filled=getFilled(shapeMatrix);
+  var dims=getDims(shapeMatrix);
+  var maxR=GRID-dims.rows,maxC=GRID-dims.cols;
+  for(var r=0;r<=maxR;r++){
+    for(var c=0;c<=maxC;c++){
+      var fits=true;
+      for(var f=0;f<filled.length;f++){
+        var br=r+filled[f][0],bc=c+filled[f][1];
+        if(boardMatrix[br][bc]!==0){fits=false;break;}
       }
-      if(fits) return true;
+      if(fits)return true;
     }
   }
   return false;
 }
 
-/**
- * hasAnyMove: iterates the three tray slots; for each non-null piece
- * calls canShapeFit against the current grid. Returns true if at least
- * one tray shape can still be placed somewhere.
- */
 function hasAnyMove(){
-  for(var i = 0; i < G.trayPieces.length; i++){
-    var p = G.trayPieces[i];
-    if(p === null) continue;
-    if(canShapeFit(G.grid, p.shapeMatrix)) return true;
+  for(var i=0;i<G.trayPieces.length;i++){
+    var p=G.trayPieces[i];
+    if(p===null)continue;
+    if(canShapeFit(G.grid,p.shapeMatrix))return true;
   }
   return false;
 }
 
-/**
- * checkEnd: the authoritative game-over gate.
- * Sets G.isGameOver and returns the result object.
- */
 function checkEnd(){
-  if(!hasAnyMove()){ G.isGameOver = true; return {state:'gameover'}; }
+  if(!hasAnyMove()){G.isGameOver=true;return {state:'gameover'};}
   return {state:'playing'};
 }
 
-// ═══════════════════════════════════════════════════════════════
-// TRAY MANAGEMENT — Dynamic difficulty-aware
-// ═══════════════════════════════════════════════════════════════
 var BC=['#ff6b35','#e040fb','#7c4dff','#ff5252','#69f0ae','#82b1ff','#ffd740','#ffab40','#ff4081','#00e5ff','#76ff03','#b388ff'];
 
 function mkPiece(shapeId){
@@ -326,42 +186,34 @@ function mkPiece(shapeId){
   return {id:res,shapeMatrix:m.map(function(r){return r.slice();}),color:BC[Math.floor(Math.random()*BC.length)]};
 }
 
-function genTrayForMode(mode, score){
-  var pool = getShapePool(mode, score || 0);
+function genTrayForMode(mode,score){
+  var pool=getShapePool(mode,score||0);
   return Array.from({length:3},function(){return mkPiece(pickWeighted(pool));});
 }
 
-function refillTray(){
-  G.trayPieces = genTrayForMode(G.activeMode, G.currentScore);
-}
+function refillTray(){G.trayPieces=genTrayForMode(G.activeMode,G.currentScore);}
 
-// ═══════════════════════════════════════════════════════════════
-// MODE INIT
-// ═══════════════════════════════════════════════════════════════
 function initMode(mode){
-  G.grid = emptyGrid();
-  G.currentScore = 0;
-  G.activeMode = mode;
-  G.isGameOver = false;
-  G.combo = 1;
-  G.totalLines = 0;
-  G.trayPieces = genTrayForMode(mode, 0);
+  G.grid=emptyGrid();
+  G.currentScore=0;
+  G.activeMode=mode;
+  G.isGameOver=false;
+  G.combo=1;
+  G.totalLines=0;
+  G.trayPieces=genTrayForMode(mode,0);
 }
 
-// ═══════════════════════════════════════════════════════════════
-// HIGH SCORE HELPERS
-// ═══════════════════════════════════════════════════════════════
-function getModeHighKey(mode){ return 'bp_mode_' + mode + '_high'; }
-function getModeHigh(mode){ return parseInt(localStorage.getItem(getModeHighKey(mode))||'0',10)||0; }
+function getModeHighKey(mode){return 'bp_mode_'+mode+'_high';}
+function getModeHigh(mode){return parseInt(localStorage.getItem(getModeHighKey(mode))||'0',10)||0;}
 function setModeHigh(mode,score){
-  var key = getModeHighKey(mode);
-  var cur = parseInt(localStorage.getItem(key)||'0',10)||0;
-  if(score > cur){ localStorage.setItem(key,score.toString()); return true; }
+  var key=getModeHighKey(mode);
+  var cur=parseInt(localStorage.getItem(key)||'0',10)||0;
+  if(score>cur){localStorage.setItem(key,score.toString());return true;}
   return false;
 }
 
 // ═══════════════════════════════════════════════════════════════
-// DRAG CONTROLLER v5 — Cached geometry + rAF-decoupled ghost
+// DRAG CONTROLLER v6 — Ghost position only in rAF, no per-move style writes
 // ═══════════════════════════════════════════════════════════════
 function DragController(opts){
   this._onCommit=opts.onCommit||function(){};
@@ -376,6 +228,8 @@ function DragController(opts){
   this._lastAnchor={r:-1,c:-1,valid:false};
   this._rafId=null;
   this._curX=0;this._curY=0;
+  this._needsRender=false;
+  this._ghostValid=null; // track valid state to avoid redundant class ops
   this._move=this._move.bind(this);
   this._up=this._up.bind(this);
   this._cancel=this._cancel.bind(this);
@@ -388,60 +242,57 @@ DragController.prototype.start=function(e,ti,piece,gridEl,slot){
   this._piece=piece;this._gridEl=gridEl;this._slot=slot;
   if(slot.setPointerCapture){try{slot.setPointerCapture(e.pointerId);}catch(_){}}
 
-  // CACHE geometry once on pointerdown
   this._gridRect=gridEl.getBoundingClientRect();
   this._cellSize=this._gridRect.width/GRID;
 
   var dims=getDims(piece.shapeMatrix);
   var sR=dims.rows,sC=dims.cols;
-  var ghostW=sC*this._cellSize,ghostH=sR*this._cellSize;
+  var cs=this._cellSize;
+  var ghostW=sC*cs,ghostH=sR*cs;
 
-  // Build ghost at 1.0× grid cell size
   this._ghost=document.createElement('div');
   this._ghost.className='drag-ghost';
   var gs=this._ghost.style;
-  gs.position='fixed';gs.width=ghostW+'px';gs.height=ghostH+'px';
-  gs.display='grid';gs.gridTemplateRows='repeat('+sR+',1fr)';gs.gridTemplateColumns='repeat('+sC+',1fr)';
-  gs.gap='2px';gs.zIndex='9999';gs.pointerEvents='none';
-  gs.opacity='0';gs.willChange='transform';
-  gs.left='0px';gs.top='0px';gs.transform='translate3d(0,0,0)';
+  gs.width=ghostW+'px';gs.height=ghostH+'px';
+  gs.display='grid';
+  gs.gridTemplateRows='repeat('+sR+',1fr)';
+  gs.gridTemplateColumns='repeat('+sC+',1fr)';
+  gs.gap='2px';gs.opacity='0';
 
   var filled=this._getFilled(piece.shapeMatrix);
+  var frag=document.createDocumentFragment();
   for(var r=0;r<sR;r++)for(var c=0;c<sC;c++){
     var isF=filled.some(function(fc){return fc[0]===r&&fc[1]===c;});
     var block=document.createElement('div');
     if(isF){
-      block.style.background='linear-gradient(135deg,'+piece.color+','+piece.color+'dd)';
-      block.style.borderRadius='4px';
-      block.style.boxShadow='inset 0 2px 3px rgba(255,255,255,0.4),inset 0 -1px 2px rgba(0,0,0,0.2),0 0 10px '+piece.color+'77';
+      block.style.cssText='background:linear-gradient(135deg,'+piece.color+','+piece.color+'dd);border-radius:4px;box-shadow:inset 0 2px 3px rgba(255,255,255,0.4),0 0 8px '+piece.color+'66;';
     }
-    this._ghost.appendChild(block);
+    frag.appendChild(block);
   }
+  this._ghost.appendChild(frag);
   document.body.appendChild(this._ghost);
 
-  // Initial position — scale up from 0.55 to 1.0
+  this._curX=e.clientX-ghostW/2;
+  this._curY=e.clientY-ghostH/2;
+  this._needsRender=true;
+  this._ghostValid=null;
+
   var self=this;
-  var sx=e.clientX - ghostW/2;
-  var sy=e.clientY - ghostH/2;
   requestAnimationFrame(function(){
-    if(self._ghost){
-      self._ghost.style.opacity='0.95';
-      self._ghost.style.transform='translate3d('+sx+'px,'+sy+'px,0) scale(1.0)';
-    }
+    if(self._ghost){self._ghost.style.opacity='0.95';}
   });
 
-  // Start rAF loop
   this._rafId=requestAnimationFrame(this._rafLoop);
-
-  document.addEventListener('pointermove',this._move);
+  document.addEventListener('pointermove',this._move,{passive:false});
   document.addEventListener('pointerup',this._up);
   document.addEventListener('pointercancel',this._cancel);
 };
 
 DragController.prototype._rafLoop=function(){
   if(!this._active)return;
-  if(this._ghost){
-    this._ghost.style.transform='translate3d('+this._curX+'px,'+this._curY+'px,0) scale(1.0)';
+  if(this._needsRender && this._ghost){
+    this._ghost.style.transform='translate3d('+this._curX+'px,'+this._curY+'px,0)';
+    this._needsRender=false;
   }
   this._rafId=requestAnimationFrame(this._rafLoop);
 };
@@ -449,25 +300,33 @@ DragController.prototype._rafLoop=function(){
 DragController.prototype._move=function(e){
   if(!this._active||e.pointerId!==this._pid)return;
   e.preventDefault();
-  this._curX=e.clientX;this._curY=e.clientY;
 
-  // Anchor from CACHED rect (no getBoundingClientRect!)
+  var dims=getDims(this._piece.shapeMatrix);
+  var ghostW=dims.cols*this._cellSize;
+  var ghostH=dims.rows*this._cellSize;
+  this._curX=e.clientX-ghostW/2;
+  this._curY=e.clientY-ghostH/2;
+  this._needsRender=true;
+
+  // Compute anchor from CACHED rect
   var relX=e.clientX-this._gridRect.left;
   var relY=e.clientY-this._gridRect.top;
   var aC=Math.floor(relX/this._cellSize);
   var aR=Math.floor(relY/this._cellSize);
   var valid=this._isValidFn(aR,aC,this._piece.shapeMatrix);
-  var filled=this._getFilled(this._piece.shapeMatrix);
 
-  if(this._ghost){
-    this._ghost.style.filter=valid
-      ?'drop-shadow(0 8px 20px rgba(0,0,0,0.6)) drop-shadow(0 0 12px rgba(105,240,174,0.45))'
-      :'drop-shadow(0 8px 20px rgba(0,0,0,0.6)) drop-shadow(0 0 12px rgba(255,82,82,0.45))';
+  // Only update ghost class when validity changes — no per-move style writes
+  if(valid!==this._ghostValid){
+    this._ghostValid=valid;
+    if(this._ghost){
+      this._ghost.classList.toggle('drag-ghost--valid',valid);
+      this._ghost.classList.toggle('drag-ghost--invalid',!valid);
+    }
   }
 
   if(aR!==this._lastAnchor.r||aC!==this._lastAnchor.c||valid!==this._lastAnchor.valid){
     this._lastAnchor={r:aR,c:aC,valid:valid};
-    this._onProj(aR,aC,valid,filled);
+    this._onProj(aR,aC,valid,this._getFilled(this._piece.shapeMatrix));
   }
 };
 
@@ -500,21 +359,21 @@ DragController.prototype._snapToGrid=function(aR,aC,cb){
   if(!this._ghost){cb();return;}
   var tx=this._gridRect.left+aC*this._cellSize;
   var ty=this._gridRect.top+aR*this._cellSize;
-  this._ghost.style.transition='transform 0.15s ease, opacity 0.15s ease';
-  this._ghost.style.transform='translate3d('+tx+'px,'+ty+'px,0) scale(0.9)';
+  this._ghost.style.transition='transform 0.12s ease,opacity 0.12s ease';
+  this._ghost.style.transform='translate3d('+tx+'px,'+ty+'px,0) scale(0.85)';
   this._ghost.style.opacity='0';
-  var self=this;setTimeout(function(){cb();},150);
+  var self=this;setTimeout(function(){cb();},120);
 };
 
 DragController.prototype._animateReturn=function(){
   if(!this._ghost){this._cleanup();return;}
   var dest=this._slot.getBoundingClientRect();
   var dx=dest.left+dest.width/2,dy=dest.top+dest.height/2;
-  this._ghost.style.transition='transform 0.4s cubic-bezier(.34,1.56,.64,1), opacity 0.35s ease';
-  this._ghost.style.transform='translate3d('+dx+'px,'+dy+'px,0) scale(0.4)';
+  this._ghost.style.transition='transform 0.3s cubic-bezier(.34,1.56,.64,1),opacity 0.28s ease';
+  this._ghost.style.transform='translate3d('+dx+'px,'+dy+'px,0) scale(0.35)';
   this._ghost.style.opacity='0';
   this._onCancel(this._ti,this._piece);
-  var self=this;setTimeout(function(){self._cleanup();},400);
+  var self=this;setTimeout(function(){self._cleanup();},300);
 };
 
 DragController.prototype._cleanup=function(){
@@ -523,36 +382,58 @@ DragController.prototype._cleanup=function(){
   this._active=false;this._pid=null;this._ti=null;this._piece=null;
   this._gridEl=null;this._slot=null;this._gridRect=null;this._cellSize=0;
   this._lastAnchor={r:-1,c:-1,valid:false};
+  this._needsRender=false;this._ghostValid=null;
 };
 DragController.prototype._clearProj=function(){this._onProj(-1,-1,false,[]);};
 DragController.prototype.abort=function(){if(!this._active)return;this._clearProj();this._animateReturn();};
 Object.defineProperty(DragController.prototype,'isActive',{get:function(){return this._active;}});
 
 // ═══════════════════════════════════════════════════════════════
-// ANIMATION CONTROLLER
+// ANIMATION CONTROLLER v6 — CSS-only blast, no chained setTimeout
 // ═══════════════════════════════════════════════════════════════
 var AnimCtrl={
   blastLines:function(rows,cols,gridEl){
     return new Promise(function(resolve){
-      var cells=gridEl.children,indices=new Set();
-      rows.forEach(function(r){for(var c=0;c<GRID;c++)indices.add(r*GRID+c);});
-      cols.forEach(function(c){for(var r=0;r<GRID;r++)indices.add(r*GRID+c);});
-      var sumR=0,sumC=0,cnt=0;
-      indices.forEach(function(idx){sumR+=Math.floor(idx/GRID);sumC+=idx%GRID;cnt++;});
+      var cells=gridEl.children,indices=[];
+      var rowSet=new Uint8Array(GRID),colSet=new Uint8Array(GRID);
+      rows.forEach(function(r){rowSet[r]=1;});
+      cols.forEach(function(c){colSet[c]=1;});
+      for(var r=0;r<GRID;r++)for(var c=0;c<GRID;c++){
+        if(rowSet[r]||colSet[c])indices.push(r*GRID+c);
+      }
+      if(!indices.length){resolve();return;}
+
+      // Compute center for delay gradient
+      var sumR=0,sumC=0,cnt=indices.length;
+      for(var i=0;i<cnt;i++){sumR+=Math.floor(indices[i]/GRID);sumC+=indices[i]%GRID;}
       var cR=sumR/cnt,cC=sumC/cnt;
-      indices.forEach(function(idx){
+      var maxDelay=0;
+
+      for(var i=0;i<cnt;i++){
+        var idx=indices[i];
         var r=Math.floor(idx/GRID),c=idx%GRID;
         var dist=Math.sqrt((r-cR)*(r-cR)+(c-cC)*(c-cC));
+        var delay=Math.round(dist*25);
+        if(delay>maxDelay)maxDelay=delay;
         var cell=cells[idx];
-        if(cell){cell.style.animationDelay=(dist*30)+'ms';cell.classList.add('grid-cell--blast');}
-      });
-      setTimeout(function(){indices.forEach(function(idx){var cell=cells[idx];if(cell){cell.classList.remove('grid-cell--blast');cell.style.animationDelay='';}});resolve();},800);
+        if(cell){
+          cell.style.animationDelay=delay+'ms';
+          cell.classList.add('grid-cell--blast');
+        }
+      }
+
+      // Resolve when longest animation done, cleanup in renderGrid
+      setTimeout(resolve, maxDelay+380);
     });
   },
   spawnComboPopup:function(text,container,x,y){
     var el=document.createElement('div');el.className='combo-popup';el.textContent=text;
     el.style.cssText='position:absolute;left:'+x+'px;top:'+y+'px;transform:translate(-50%,0);pointer-events:none;z-index:3000;';
-    container.appendChild(el);setTimeout(function(){el.remove();},1200);
+    container.appendChild(el);
+    // Use animation end rather than setTimeout where possible
+    el.addEventListener('animationend',function(){el.remove();},{once:true});
+    // Fallback
+    setTimeout(function(){if(el.parentNode)el.remove();},1100);
   },
   animateScore:function(from,to,duration,onTick){
     var start=performance.now(),diff=to-from;
@@ -566,9 +447,6 @@ var AnimCtrl={
   },
 };
 
-// ═══════════════════════════════════════════════════════════════
-// EXPORTS
-// ═══════════════════════════════════════════════════════════════
 var BlockPuzzle={
   G:G, GRID:GRID, MODES:MODES,
   initMode:initMode,
@@ -582,7 +460,5 @@ var BlockPuzzle={
 };
 if(typeof window!=='undefined')window.BlockPuzzle=BlockPuzzle;
 
-}catch(e){
-  console.error('[BP] Engine init error:',e);
-}
+}catch(e){console.error('[BP] Engine init error:',e);}
 })();
