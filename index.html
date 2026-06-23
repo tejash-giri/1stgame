@@ -387,38 +387,41 @@ onReady(function initUI(){
     var y=gr.top-wr.top+row*cs;
     BlockPuzzle.AnimCtrl.spawnComboPopup(text,$wrapper,x,y);
   }
-
-  // ── Drag Controller ──
+// ── Drag Controller ──
   var dragCtrl=new BlockPuzzle.DragController({
     onCommit:function(ti,gR,gC,piece){
       clearProj();
       var result=BlockPuzzle.placeBlock(gR,gC,piece.shapeMatrix,piece.color,ti);
       var gs=BlockPuzzle.G;
       if(result.lines>0){
-        // Fix: compute pixel position for combo popup
+        // Read layout properties BEFORE writing to prevent thrashing
         var gr=$grid.getBoundingClientRect(),wr=$wrapper.getBoundingClientRect();
-        var cs=gr.width/BlockPuzzle.GRID;
-        var aR=0,aC=0,cnt=0;
-        result.rows.forEach(function(r){aR+=r;cnt++;});
-        result.cols.forEach(function(c){aC+=c;cnt++;});
-        if(cnt>0){aR/=cnt;aC/=cnt;}
-        var px=gr.left-wr.left+(aC+0.5)*cs;
-        var py=gr.top-wr.top+aR*cs;
-        var ct='+'+result.scoreGained;if(result.combo>1)ct+=' x'+result.combo+' Combo!';
-        BlockPuzzle.AnimCtrl.spawnComboPopup(ct,$wrapper,px,py);
-        BlockPuzzle.AnimCtrl.blastLines(result.rows,result.cols,$grid).then(function(){
-          var cells=$grid.children;
-          for(var i=0;i<cells.length;i++){cells[i].classList.remove('grid-cell--blast');cells[i].style.animationDelay='';}
-          _prevGrid=null;
-          _prevBg=null;
-          renderGrid();renderTray();
-          if(result.endState&&result.endState.state==='gameover'){
-            setTimeout(function(){
-              var fs=Math.floor(gs.currentScore);
-              var isNewBest=BlockPuzzle.setModeHigh(gs.activeMode,fs);
-              showGameOver(fs,BlockPuzzle.getModeHigh(gs.activeMode),isNewBest);
-            },200);
-          }
+        
+        requestAnimationFrame(function() {
+          var cs=gr.width/BlockPuzzle.GRID;
+          var aR=0,aC=0,cnt=0;
+          result.rows.forEach(function(r){aR+=r;cnt++;});
+          result.cols.forEach(function(c){aC+=c;cnt++;});
+          if(cnt>0){aR/=cnt;aC/=cnt;}
+          var px=gr.left-wr.left+(aC+0.5)*cs;
+          var py=gr.top-wr.top+aR*cs;
+          var ct='+'+result.scoreGained;if(result.combo>1)ct+=' x'+result.combo+' Combo!';
+          
+          BlockPuzzle.AnimCtrl.spawnComboPopup(ct,$wrapper,px,py);
+          BlockPuzzle.AnimCtrl.blastLines(result.rows,result.cols,$grid).then(function(){
+            var cells=$grid.children;
+            for(var i=0;i<cells.length;i++){cells[i].classList.remove('grid-cell--blast');cells[i].style.animationDelay='';}
+            _prevGrid=null;
+            _prevBg=null;
+            renderGrid();renderTray();
+            if(result.endState&&result.endState.state==='gameover'){
+              setTimeout(function(){
+                var fs=Math.floor(gs.currentScore);
+                var isNewBest=BlockPuzzle.setModeHigh(gs.activeMode,fs);
+                showGameOver(fs,BlockPuzzle.getModeHigh(gs.activeMode),isNewBest);
+              },200);
+            }
+          });
         });
       }else{
         renderGrid();renderTray();
@@ -439,7 +442,6 @@ onReady(function initUI(){
     isValidFn:function(r,c,s){return BlockPuzzle.isValid(r,c,s);},
     getFilledCells:function(s){return BlockPuzzle.getFilled(s);},
   });
-
   function onTrayPointerDown(e,idx){
     var gs=BlockPuzzle.G;
     if(gs.isGameOver)return;
@@ -471,9 +473,13 @@ onReady(function initUI(){
   });
   document.getElementById('btn-go-menu').onclick=function(){hideGameOver();showScreen('menu');updateModeBestScores();};
   document.getElementById('btn-go-retry').onclick=function(){hideGameOver();startGame(ui.activeMode);};
-  document.getElementById('screen-game').addEventListener('touchmove',function(e){e.preventDefault();},{passive:false});
 
-  updateModeBestScores();
+// Change your current line to use passive check logic:
+  document.getElementById('screen-game').addEventListener('touchmove',function(e){
+    if(e.cancelable) e.preventDefault();
+  },{passive:false});
+
+   updateModeBestScores();
 
 }); // end onReady
 
