@@ -142,6 +142,8 @@ function clearLines(){
   return {rows:rows,cols:cols,total:total,combo:total<=1?1:total===2?2:3};
 }
 
+
+
 function calcScore(cr){
   if(cr.total===0)return 0;
   return Math.floor(100*cr.total*cr.combo);
@@ -247,6 +249,8 @@ DragController.prototype.start=function(e,ti,piece,gridEl,slot){
 
   var dims=getDims(piece.shapeMatrix);
   var sR=dims.rows,sC=dims.cols;
+  // Cache dims so _move never calls getDims() on every pointermove
+  this._dims={rows:sR,cols:sC};
   var cs=this._cellSize;
   var ghostW=sC*cs,ghostH=sR*cs;
 
@@ -305,7 +309,7 @@ DragController.prototype._move=function(e){
   if(!this._active||e.pointerId!==this._pid)return;
   e.preventDefault();
 
-  var dims=getDims(this._piece.shapeMatrix);
+  var dims=this._dims; // use cached — no getDims() per move
   var ghostW=dims.cols*this._cellSize;
   var ghostH=dims.rows*this._cellSize;
   this._curX=e.clientX-ghostW/2;
@@ -320,7 +324,6 @@ DragController.prototype._move=function(e){
   var relY=ghostCY-this._gridRect.top;
   var aC=Math.floor(relX/this._cellSize - dims.cols/2 + 0.5);
   var aR=Math.floor(relY/this._cellSize - dims.rows/2 + 0.5);
-  var valid=this._isValidFn(aR,aC,this._piece.shapeMatrix);
   var valid=this._isValidFn(aR,aC,this._piece.shapeMatrix);
 
   // Only update ghost class when validity changes — no per-move style writes
@@ -355,8 +358,7 @@ DragController.prototype._finish=function(cx,cy,cancelled){
   document.removeEventListener('pointercancel',this._cancel);
   this._clearProj();
   if(cancelled||!this._piece){this._animateReturn();return;}
-  // Match ghost-center anchor from _move
-  var dims=getDims(this._piece.shapeMatrix);
+  var dims=this._dims;
   var ghostW=dims.cols*this._cellSize;
   var ghostH=dims.rows*this._cellSize;
   var ghostCX=cx; // ghost cx = pointer x (centered horizontally)
@@ -395,6 +397,7 @@ DragController.prototype._cleanup=function(){
   if(this._ghost){this._ghost.remove();this._ghost=null;}
   this._active=false;this._pid=null;this._ti=null;this._piece=null;
   this._gridEl=null;this._slot=null;this._gridRect=null;this._cellSize=0;
+  this._dims=null;
   this._lastAnchor={r:-1,c:-1,valid:false};
   this._needsRender=false;this._ghostValid=null;
 };

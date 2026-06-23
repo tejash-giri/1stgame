@@ -16,6 +16,8 @@ html,body{
   font-family:'Segoe UI',system-ui,-apple-system,sans-serif;
   overflow:hidden;-webkit-tap-highlight-color:transparent;user-select:none;
   overscroll-behavior:none;
+  /* FIX: kills 300ms tap delay on Android Chrome */
+  touch-action:none;
 }
 
 #app-container{

@@ -228,11 +228,25 @@ onReady(function initUI(){
     var cells=$grid.children;
     var prev=_prevGrid;
     var prevBg=_prevBg;
-    if(!prev){
+
+
+
+  if(!prev){
       prev=new Array(GRID*GRID);
       prevBg=new Array(GRID*GRID);
-      for(var x=0;x<GRID*GRID;x++){prev[x]=undefined;prevBg[x]='';}
+      for(var x=0;x<GRID*GRID;x++){
+        prev[x]=undefined;
+        prevBg[x]='';
+        // Force fully clear style attributes on DOM elements during a reset
+        if(cells[x]){
+          cells[x].className='grid-cell';
+          cells[x].style.background='';
+        }
+      }
     }
+
+
+
 
     for(var r=0;r<GRID;r++){
       for(var c=0;c<GRID;c++){
@@ -381,36 +395,44 @@ onReady(function initUI(){
       var result=BlockPuzzle.placeBlock(gR,gC,piece.shapeMatrix,piece.color,ti);
       var gs=BlockPuzzle.G;
       if(result.lines>0){
+        // Fix: compute pixel position for combo popup
+        var gr=$grid.getBoundingClientRect(),wr=$wrapper.getBoundingClientRect();
+        var cs=gr.width/BlockPuzzle.GRID;
         var aR=0,aC=0,cnt=0;
         result.rows.forEach(function(r){aR+=r;cnt++;});
         result.cols.forEach(function(c){aC+=c;cnt++;});
         if(cnt>0){aR/=cnt;aC/=cnt;}
+        var px=gr.left-wr.left+(aC+0.5)*cs;
+        var py=gr.top-wr.top+aR*cs;
         var ct='+'+result.scoreGained;if(result.combo>1)ct+=' x'+result.combo+' Combo!';
-        spawnComboPopup(ct,aR,aC);
+        BlockPuzzle.AnimCtrl.spawnComboPopup(ct,$wrapper,px,py);
         BlockPuzzle.AnimCtrl.blastLines(result.rows,result.cols,$grid).then(function(){
           var cells=$grid.children;
           for(var i=0;i<cells.length;i++){cells[i].classList.remove('grid-cell--blast');cells[i].style.animationDelay='';}
           _prevGrid=null;
-          _prevBg=null; // FIX: also reset bg cache after blast
+          _prevBg=null;
           renderGrid();renderTray();
+          if(result.endState&&result.endState.state==='gameover'){
+            setTimeout(function(){
+              var fs=Math.floor(gs.currentScore);
+              var isNewBest=BlockPuzzle.setModeHigh(gs.activeMode,fs);
+              showGameOver(fs,BlockPuzzle.getModeHigh(gs.activeMode),isNewBest);
+            },200);
+          }
         });
       }else{
         renderGrid();renderTray();
-      }
-      var prev=gs.currentScore-result.scoreGained;
-      animateScoreDisplay(Math.floor(prev),Math.floor(gs.currentScore));
-      updateHUD();
-      var delay=result.lines>0?420:50;
-      setTimeout(function(){
         if(result.endState&&result.endState.state==='gameover'){
           setTimeout(function(){
             var fs=Math.floor(gs.currentScore);
             var isNewBest=BlockPuzzle.setModeHigh(gs.activeMode,fs);
-            var modeHigh=BlockPuzzle.getModeHigh(gs.activeMode);
-            showGameOver(fs,modeHigh,isNewBest);
-          },100);
+            showGameOver(fs,BlockPuzzle.getModeHigh(gs.activeMode),isNewBest);
+          },80);
         }
-      },delay);
+      }
+      var prev=gs.currentScore-result.scoreGained;
+      animateScoreDisplay(Math.floor(prev),Math.floor(gs.currentScore));
+      updateHUD();
     },
     onCancel:function(){clearProj();renderTray();},
     onProjectionChange:function(aR,aC,v,f){highlightProj(aR,aC,v,f);},
