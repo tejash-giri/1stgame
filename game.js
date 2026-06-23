@@ -275,7 +275,9 @@ DragController.prototype.start=function(e,ti,piece,gridEl,slot){
   document.body.appendChild(this._ghost);
 
   this._curX=e.clientX-ghostW/2;
-  this._curY=e.clientY-ghostH/2;
+  // Offset ghost ABOVE finger so piece visible during drag (not under thumb)
+  // 80px above center = comfortable on mobile
+  this._curY=e.clientY-ghostH-80;
   this._needsRender=true;
   this._ghostValid=null;
 
@@ -307,14 +309,18 @@ DragController.prototype._move=function(e){
   var ghostW=dims.cols*this._cellSize;
   var ghostH=dims.rows*this._cellSize;
   this._curX=e.clientX-ghostW/2;
-  this._curY=e.clientY-ghostH/2;
+  // Same above-finger offset as start
+  this._curY=e.clientY-ghostH-80;
   this._needsRender=true;
 
-  // Compute anchor from CACHED rect
-  var relX=e.clientX-this._gridRect.left;
-  var relY=e.clientY-this._gridRect.top;
-  var aC=Math.floor(relX/this._cellSize);
-  var aR=Math.floor(relY/this._cellSize);
+  // Projection anchor from ghost CENTER (not raw pointer) so preview matches ghost
+  var ghostCX=this._curX+ghostW/2;
+  var ghostCY=this._curY+ghostH/2;
+  var relX=ghostCX-this._gridRect.left;
+  var relY=ghostCY-this._gridRect.top;
+  var aC=Math.floor(relX/this._cellSize - dims.cols/2 + 0.5);
+  var aR=Math.floor(relY/this._cellSize - dims.rows/2 + 0.5);
+  var valid=this._isValidFn(aR,aC,this._piece.shapeMatrix);
   var valid=this._isValidFn(aR,aC,this._piece.shapeMatrix);
 
   // Only update ghost class when validity changes — no per-move style writes
@@ -349,8 +355,14 @@ DragController.prototype._finish=function(cx,cy,cancelled){
   document.removeEventListener('pointercancel',this._cancel);
   this._clearProj();
   if(cancelled||!this._piece){this._animateReturn();return;}
-  var aC=Math.floor((cx-this._gridRect.left)/this._cellSize);
-  var aR=Math.floor((cy-this._gridRect.top)/this._cellSize);
+  // Match ghost-center anchor from _move
+  var dims=getDims(this._piece.shapeMatrix);
+  var ghostW=dims.cols*this._cellSize;
+  var ghostH=dims.rows*this._cellSize;
+  var ghostCX=cx; // ghost cx = pointer x (centered horizontally)
+  var ghostCY=(cx,cy-80-ghostH/2); // ghost top = cy-ghostH-80, center = +ghostH/2
+  var aC=Math.floor((ghostCX-this._gridRect.left)/this._cellSize - dims.cols/2 + 0.5);
+  var aR=Math.floor(((cy-80-ghostH/2)-this._gridRect.top)/this._cellSize - dims.rows/2 + 0.5);
   var self=this;
   if(this._isValidFn(aR,aC,this._piece.shapeMatrix)){
     this._snapToGrid(aR,aC,function(){self._onCommit(self._ti,aR,aC,self._piece);self._cleanup();});
