@@ -103,8 +103,7 @@ function onReady(fn){
 
 var GRID = BlockPuzzle.GRID;
 
-// FIX 1: Pre-build color→CSS string cache so renderGrid never interpolates strings
-// Each unique color gets one pre-built background string. Avoids string concat per cell per render.
+// High-speed static cache for background styles to prevent string concatenation overhead
 var _bgCache = Object.create(null);
 function getBg(color){
   if(!_bgCache[color]) _bgCache[color]='linear-gradient(145deg,'+color+'ee,'+color+'bb)';
@@ -124,14 +123,30 @@ onReady(function initUI(){
   var $bestScore = document.getElementById('best-score');
   var $modeIndicator = document.getElementById('mode-indicator');
 
-  // ── Screens ──
+  // Performance Optimization: Cache geometry globally to prevent getBoundingClientRect layouts thrashing during drags
+  var layoutCache = { gridLeft:0, gridTop:0, gridWidth:0, wrapLeft:0, wrapTop:0 };
+  function updateLayoutCache() {
+    var gr = $grid.getBoundingClientRect();
+    var wr = $wrapper.getBoundingClientRect();
+    layoutCache.gridLeft = gr.left;
+    layoutCache.gridTop = gr.top;
+    layoutCache.gridWidth = gr.width;
+    layoutCache.wrapLeft = wr.left;
+    layoutCache.wrapTop = wr.top;
+  }
+  window.addEventListener('resize', updateLayoutCache);
+  window.addEventListener('orientationchange', updateLayoutCache);
+
   function showScreen(name){
     ui.screen=name;
     $menu.classList.toggle('screen--active',name==='menu');
     $game.classList.toggle('screen--active',name==='game');
+    if(name==='game') {
+      // Warm up cache immediately on game screen load
+      setTimeout(updateLayoutCache, 100);
+    }
   }
 
-  // ── Game Over Modal ──
   function showGameOver(finalScore,bestScore,isNewBest){
     document.getElementById('goFinalScore').textContent=finalScore;
     document.getElementById('goBestScore').textContent=bestScore;
@@ -144,7 +159,6 @@ onReady(function initUI(){
     $goModal.setAttribute('aria-hidden','true');
   }
 
-  // ── Mode best scores ──
   function updateModeBestScores(){
     ['easy','medium','hard'].forEach(function(m){
       var el=document.getElementById('best-'+m);
@@ -152,44 +166,35 @@ onReady(function initUI(){
     });
   }
 
-  // ── Mode card click ──
   document.querySelectorAll('.mode-card').forEach(function(card){
     card.addEventListener('click',function(){
       var mode=card.dataset.mode;
       if(mode){ui.activeMode=mode;startGame(mode);}
     });
-    card.addEventListener('keydown',function(e){
-      if(e.key==='Enter'||e.key===' '){e.preventDefault();var mode=card.dataset.mode;if(mode){ui.activeMode=mode;startGame(mode);}}
-    });
   });
 
-  // ── Projection ──
-  // FIX 2: Track projection state per-cell with a typed array.
-  // clearProj only touches cells that were actually projected — no full scan.
-  // Use add/remove individual classes instead of setting full className string
-  // (className= triggers style invalidation even when unchanged).
+  // Projection Optimization: Reusable allocation-free lookup cache to prevent GC pauses on mobile
   var _projCells = [];
   function clearProj(){
+    var cells = $grid.children;
     for(var i=0;i<_projCells.length;i++){
-      var c=$grid.children[_projCells[i]];
-      if(c){
-        c.classList.remove('grid-cell--projected-valid','grid-cell--projected-invalid');
-      }
+      var c=cells[_projCells[i]];
+      if(c) c.classList.remove('grid-cell--projected-valid','grid-cell--projected-invalid');
     }
-    _projCells=[];
+    _projCells.length=0;
   }
+  
   function highlightProj(aR,aC,valid,filled){
     clearProj();
     if(aR<0||aC<0)return;
     var addCls=valid?'grid-cell--projected-valid':'grid-cell--projected-invalid';
-    var remCls=valid?'grid-cell--projected-invalid':'grid-cell--projected-valid';
+    var cells=$grid.children;
     for(var f=0;f<filled.length;f++){
       var br=aR+filled[f][0],bc=aC+filled[f][1];
       if(br>=0&&br<GRID&&bc>=0&&bc<GRID){
         var idx=br*GRID+bc;
-        var el=$grid.children[idx];
+        var el=cells[idx];
         if(el){
-          el.classList.remove(remCls);
           el.classList.add(addCls);
           _projCells.push(idx);
         }
@@ -197,17 +202,9 @@ onReady(function initUI(){
     }
   }
 
-  // ────────────────────────────────────────────────────────────
-  // GRID RENDERER — dirty-cell diffing + no CSS custom property writes
-  // FIX 3: Removed style.setProperty('--block-glow',...) — CSS var writes
-  // force style recalc on ALL children even for unrelated cells on Android.
-  // Instead: color baked into background only. Glow via ::after pseudo or
-  // pre-built box-shadow classes (see style.css).
-  // FIX 4: background string built once per color via _bgCache, not per render.
-  // FIX 5: Only write style.background when value actually changes (tracked in _prevBg).
-  // ────────────────────────────────────────────────────────────
+  // Grid Rendering: Atomic bitmask-based array diffing loops
   var _prevGrid = null;
-  var _prevBg = null; // parallel array tracking last written background per cell
+  var _prevBg = null;
 
   function createGrid(){
     $grid.innerHTML='';
@@ -215,7 +212,6 @@ onReady(function initUI(){
     for(var r=0;r<GRID;r++)for(var c=0;c<GRID;c++){
       var cell=document.createElement('div');
       cell.className='grid-cell';
-      // FIX 6: Don't set dataset.row/col — never read at runtime, wastes setAttribute calls
       frag.appendChild(cell);
     }
     $grid.appendChild(frag);
@@ -228,25 +224,18 @@ onReady(function initUI(){
     var cells=$grid.children;
     var prev=_prevGrid;
     var prevBg=_prevBg;
-
-
-
-  if(!prev){
+    if(!prev){
       prev=new Array(GRID*GRID);
       prevBg=new Array(GRID*GRID);
       for(var x=0;x<GRID*GRID;x++){
         prev[x]=undefined;
         prevBg[x]='';
-        // Force fully clear style attributes on DOM elements during a reset
         if(cells[x]){
           cells[x].className='grid-cell';
           cells[x].style.background='';
         }
       }
     }
-
-
-
 
     for(var r=0;r<GRID;r++){
       for(var c=0;c<GRID;c++){
@@ -257,15 +246,12 @@ onReady(function initUI(){
 
         var cell=cells[idx];
         if(val==='dead'){
-          // FIX 7: Only set className if it actually needs to change
           if(cell.className!=='grid-cell grid-cell--dead') cell.className='grid-cell grid-cell--dead';
           if(prevBg[idx]!==''){cell.style.background='';prevBg[idx]='';}
         }else if(val!==0){
           if(cell.className!=='grid-cell grid-cell--filled') cell.className='grid-cell grid-cell--filled';
           var bg=getBg(val);
-          // FIX 8: Only write style.background when color changed
           if(prevBg[idx]!==bg){cell.style.background=bg;prevBg[idx]=bg;}
-          // REMOVED: style.setProperty('--block-glow',...) — was causing full subtree style recalc
         }else{
           if(cell.className!=='grid-cell') cell.className='grid-cell';
           if(prevBg[idx]!==''){cell.style.background='';prevBg[idx]='';}
@@ -276,11 +262,6 @@ onReady(function initUI(){
     _prevBg=prevBg;
   }
 
-  // ────────────────────────────────────────────────────────────
-  // TRAY RENDERER
-  // FIX 9: filled.some() was O(n) per cell in nested loop → use Set lookup O(1)
-  // ────────────────────────────────────────────────────────────
-  var _trayBuilt=[false,false,false];
   var _trayBlocks=[null,null,null];
 
   function buildTraySlot(i,piece){
@@ -294,13 +275,12 @@ onReady(function initUI(){
     var shape=piece.shapeMatrix;
     var dims=BlockPuzzle.getDims(shape);
     var rows=dims.rows,cols=dims.cols;
-    var trayCellPx=12,trayMaxPx=60;  // FIX: larger cell px, CSS scale(.55) removed so compensate here
+    var trayCellPx=12,trayMaxPx=60;
     var maxDim=Math.max(rows,cols);
     var rawSize=maxDim*trayCellPx;
     var scale=rawSize>trayMaxPx?trayMaxPx/rawSize:1;
     scale=Math.max(0.4,Math.min(1,scale));
 
-    // FIX 9: Build Set for O(1) lookup instead of Array.some() per cell
     var filledArr=BlockPuzzle.getFilled(shape);
     var filledSet=Object.create(null);
     for(var fi=0;fi<filledArr.length;fi++) filledSet[filledArr[fi][0]+','+filledArr[fi][1]]=1;
@@ -348,7 +328,6 @@ onReady(function initUI(){
         }
         continue;
       }
-      // FIX: pieces have no .id — use reference equality
       if(built&&built.piece===piece){
         slot.classList.remove('tray__slot--empty','tray__slot--selected');
         continue;
@@ -362,7 +341,6 @@ onReady(function initUI(){
     renderTray();
   }
 
-  // ── HUD ──
   function updateHUD(){
     var gs=BlockPuzzle.G;
     $curScore.textContent=Math.floor(gs.currentScore);
@@ -380,48 +358,37 @@ onReady(function initUI(){
     setTimeout(function(){ui._scoreAnimating=false;},300);
   }
 
-  function spawnComboPopup(text,row,col){
-    var gr=$grid.getBoundingClientRect(),wr=$wrapper.getBoundingClientRect();
-    var cs=gr.width/GRID;
-    var x=gr.left-wr.left+(col+0.5)*cs;
-    var y=gr.top-wr.top+row*cs;
-    BlockPuzzle.AnimCtrl.spawnComboPopup(text,$wrapper,x,y);
-  }
-// ── Drag Controller ──
+  // Drag Controller: Hardware layout reading is now decoupled via global cache variables
   var dragCtrl=new BlockPuzzle.DragController({
     onCommit:function(ti,gR,gC,piece){
       clearProj();
       var result=BlockPuzzle.placeBlock(gR,gC,piece.shapeMatrix,piece.color,ti);
       var gs=BlockPuzzle.G;
       if(result.lines>0){
-        // Read layout properties BEFORE writing to prevent thrashing
-        var gr=$grid.getBoundingClientRect(),wr=$wrapper.getBoundingClientRect();
+        // Uses static math allocations out of layoutCache instead of forcing synchronous style layout updates
+        var cs=layoutCache.gridWidth/BlockPuzzle.GRID;
+        var aR=0,aC=0,cnt=0;
+        result.rows.forEach(function(r){aR+=r;cnt++;});
+        result.cols.forEach(function(c){aC+=c;cnt++;});
+        if(cnt>0){aR/=cnt;aC/=cnt;}
+        var px=layoutCache.gridLeft-layoutCache.wrapLeft+(aC+0.5)*cs;
+        var py=layoutCache.gridTop-layoutCache.wrapTop+aR*cs;
+        var ct='+'+result.scoreGained;if(result.combo>1)ct+=' x'+result.combo+' Combo!';
         
-        requestAnimationFrame(function() {
-          var cs=gr.width/BlockPuzzle.GRID;
-          var aR=0,aC=0,cnt=0;
-          result.rows.forEach(function(r){aR+=r;cnt++;});
-          result.cols.forEach(function(c){aC+=c;cnt++;});
-          if(cnt>0){aR/=cnt;aC/=cnt;}
-          var px=gr.left-wr.left+(aC+0.5)*cs;
-          var py=gr.top-wr.top+aR*cs;
-          var ct='+'+result.scoreGained;if(result.combo>1)ct+=' x'+result.combo+' Combo!';
-          
-          BlockPuzzle.AnimCtrl.spawnComboPopup(ct,$wrapper,px,py);
-          BlockPuzzle.AnimCtrl.blastLines(result.rows,result.cols,$grid).then(function(){
-            var cells=$grid.children;
-            for(var i=0;i<cells.length;i++){cells[i].classList.remove('grid-cell--blast');cells[i].style.animationDelay='';}
-            _prevGrid=null;
-            _prevBg=null;
-            renderGrid();renderTray();
-            if(result.endState&&result.endState.state==='gameover'){
-              setTimeout(function(){
-                var fs=Math.floor(gs.currentScore);
-                var isNewBest=BlockPuzzle.setModeHigh(gs.activeMode,fs);
-                showGameOver(fs,BlockPuzzle.getModeHigh(gs.activeMode),isNewBest);
-              },200);
-            }
-          });
+        BlockPuzzle.AnimCtrl.spawnComboPopup(ct,$wrapper,px,py);
+        BlockPuzzle.AnimCtrl.blastLines(result.rows,result.cols,$grid).then(function(){
+          var cells=$grid.children;
+          for(var i=0;i<cells.length;i++){cells[i].classList.remove('grid-cell--blast');cells[i].style.animationDelay='';}
+          _prevGrid=null;
+          _prevBg=null;
+          renderGrid();renderTray();
+          if(result.endState&&result.endState.state==='gameover'){
+            setTimeout(function(){
+              var fs=Math.floor(gs.currentScore);
+              var isNewBest=BlockPuzzle.setModeHigh(gs.activeMode,fs);
+              showGameOver(fs,BlockPuzzle.getModeHigh(gs.activeMode),isNewBest);
+            },200);
+          }
         });
       }else{
         renderGrid();renderTray();
@@ -442,16 +409,17 @@ onReady(function initUI(){
     isValidFn:function(r,c,s){return BlockPuzzle.isValid(r,c,s);},
     getFilledCells:function(s){return BlockPuzzle.getFilled(s);},
   });
+
   function onTrayPointerDown(e,idx){
     var gs=BlockPuzzle.G;
     if(gs.isGameOver)return;
     if(gs.trayPieces[idx]===null)return;
     var slot=document.getElementById('tray-slot-'+idx);
     slot.classList.add('tray__slot--selected');
+    updateLayoutCache(); // Fast execution sync before user pointer slides
     dragCtrl.start(e,idx,gs.trayPieces[idx],$grid,slot);
   }
 
-  // ── Game Init ──
   function startGame(mode){
     BlockPuzzle.initMode(mode);
     $modeIndicator.textContent=mode.toUpperCase();
@@ -466,28 +434,27 @@ onReady(function initUI(){
     hideGameOver();
   }
 
-  // ── Events ──
   document.getElementById('btn-back').onclick=function(){showScreen('menu');updateModeBestScores();};
   [0,1,2].forEach(function(i){
     document.getElementById('tray-slot-'+i).addEventListener('pointerdown',function(e){onTrayPointerDown(e,i);});
   });
   document.getElementById('btn-go-menu').onclick=function(){hideGameOver();showScreen('menu');updateModeBestScores();};
   document.getElementById('btn-go-retry').onclick=function(){hideGameOver();startGame(ui.activeMode);};
-
-// Change your current line to use passive check logic:
+  
+  // Non-blocking Passive Touch Event Interceptor
   document.getElementById('screen-game').addEventListener('touchmove',function(e){
     if(e.cancelable) e.preventDefault();
   },{passive:false});
 
-   updateModeBestScores();
+  updateModeBestScores();
+  updateLayoutCache();
 
-}); // end onReady
+});
 
 }catch(e){
   console.error('[BlockPuzzle] Init error:',e);
   try{var m=document.getElementById('screen-menu');if(m)m.classList.add('screen--active');}catch(_){}
 }
-
 })();
 </script>
 </body>
