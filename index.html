@@ -4,7 +4,7 @@
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=no,viewport-fit=cover"/>
   <meta name="apple-mobile-web-app-capable" content="yes"/>
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translacent"/>
   <title>Block Puzzle</title>
   <link rel="stylesheet" href="style.css"/>
 </head>
@@ -103,6 +103,14 @@ function onReady(fn){
 
 var GRID = BlockPuzzle.GRID;
 
+// FIX 1: Pre-build color→CSS string cache so renderGrid never interpolates strings
+// Each unique color gets one pre-built background string. Avoids string concat per cell per render.
+var _bgCache = Object.create(null);
+function getBg(color){
+  if(!_bgCache[color]) _bgCache[color]='linear-gradient(145deg,'+color+'ee,'+color+'bb)';
+  return _bgCache[color];
+}
+
 onReady(function initUI(){
 
   var ui = { screen:'menu', activeMode:null, _scoreAnimating:false };
@@ -156,34 +164,50 @@ onReady(function initUI(){
   });
 
   // ── Projection ──
+  // FIX 2: Track projection state per-cell with a typed array.
+  // clearProj only touches cells that were actually projected — no full scan.
+  // Use add/remove individual classes instead of setting full className string
+  // (className= triggers style invalidation even when unchanged).
   var _projCells = [];
   function clearProj(){
     for(var i=0;i<_projCells.length;i++){
       var c=$grid.children[_projCells[i]];
-      if(c)c.className='grid-cell';
+      if(c){
+        c.classList.remove('grid-cell--projected-valid','grid-cell--projected-invalid');
+      }
     }
     _projCells=[];
   }
   function highlightProj(aR,aC,valid,filled){
     clearProj();
     if(aR<0||aC<0)return;
-    var cls=valid?'grid-cell grid-cell--projected-valid':'grid-cell grid-cell--projected-invalid';
+    var addCls=valid?'grid-cell--projected-valid':'grid-cell--projected-invalid';
+    var remCls=valid?'grid-cell--projected-invalid':'grid-cell--projected-valid';
     for(var f=0;f<filled.length;f++){
       var br=aR+filled[f][0],bc=aC+filled[f][1];
       if(br>=0&&br<GRID&&bc>=0&&bc<GRID){
         var idx=br*GRID+bc;
         var el=$grid.children[idx];
-        if(el){el.className=cls;_projCells.push(idx);}
+        if(el){
+          el.classList.remove(remCls);
+          el.classList.add(addCls);
+          _projCells.push(idx);
+        }
       }
     }
   }
 
   // ────────────────────────────────────────────────────────────
-  // OPTIMIZED GRID RENDERER — dirty-cell diffing
-  // Tracks previous state; only touches DOM for changed cells.
-  // On 6×6 = 36 cells, a typical placement changes 1-9 cells.
+  // GRID RENDERER — dirty-cell diffing + no CSS custom property writes
+  // FIX 3: Removed style.setProperty('--block-glow',...) — CSS var writes
+  // force style recalc on ALL children even for unrelated cells on Android.
+  // Instead: color baked into background only. Glow via ::after pseudo or
+  // pre-built box-shadow classes (see style.css).
+  // FIX 4: background string built once per color via _bgCache, not per render.
+  // FIX 5: Only write style.background when value actually changes (tracked in _prevBg).
   // ────────────────────────────────────────────────────────────
-  var _prevGrid = null; // flat array of GRID*GRID prev values
+  var _prevGrid = null;
+  var _prevBg = null; // parallel array tracking last written background per cell
 
   function createGrid(){
     $grid.innerHTML='';
@@ -191,53 +215,59 @@ onReady(function initUI(){
     for(var r=0;r<GRID;r++)for(var c=0;c<GRID;c++){
       var cell=document.createElement('div');
       cell.className='grid-cell';
-      cell.dataset.row=r;cell.dataset.col=c;
+      // FIX 6: Don't set dataset.row/col — never read at runtime, wastes setAttribute calls
       frag.appendChild(cell);
     }
     $grid.appendChild(frag);
-    _prevGrid=null; // force full repaint on first render
+    _prevGrid=null;
+    _prevBg=null;
   }
 
   function renderGrid(){
     var grid=BlockPuzzle.G.grid;
     var cells=$grid.children;
     var prev=_prevGrid;
-    if(!prev){prev=new Array(GRID*GRID);for(var x=0;x<GRID*GRID;x++)prev[x]=undefined;}
+    var prevBg=_prevBg;
+    if(!prev){
+      prev=new Array(GRID*GRID);
+      prevBg=new Array(GRID*GRID);
+      for(var x=0;x<GRID*GRID;x++){prev[x]=undefined;prevBg[x]='';}
+    }
 
     for(var r=0;r<GRID;r++){
       for(var c=0;c<GRID;c++){
         var idx=r*GRID+c;
         var val=grid[r][c];
-        if(val===prev[idx])continue; // SKIP — unchanged cell
+        if(val===prev[idx])continue;
         prev[idx]=val;
 
         var cell=cells[idx];
-        // Remove projection classes too (projection cleared separately)
         if(val==='dead'){
-          cell.className='grid-cell grid-cell--dead';
-          cell.style.background='';
-          cell.style.setProperty('--block-glow','transparent');
+          // FIX 7: Only set className if it actually needs to change
+          if(cell.className!=='grid-cell grid-cell--dead') cell.className='grid-cell grid-cell--dead';
+          if(prevBg[idx]!==''){cell.style.background='';prevBg[idx]='';}
         }else if(val!==0){
-          cell.className='grid-cell grid-cell--filled';
-          cell.style.background='linear-gradient(145deg,'+val+'ee,'+val+'bb)';
-          cell.style.setProperty('--block-glow',val+'66');
+          if(cell.className!=='grid-cell grid-cell--filled') cell.className='grid-cell grid-cell--filled';
+          var bg=getBg(val);
+          // FIX 8: Only write style.background when color changed
+          if(prevBg[idx]!==bg){cell.style.background=bg;prevBg[idx]=bg;}
+          // REMOVED: style.setProperty('--block-glow',...) — was causing full subtree style recalc
         }else{
-          cell.className='grid-cell';
-          cell.style.background='';
-          cell.style.setProperty('--block-glow','transparent');
+          if(cell.className!=='grid-cell') cell.className='grid-cell';
+          if(prevBg[idx]!==''){cell.style.background='';prevBg[idx]='';}
         }
       }
     }
     _prevGrid=prev;
+    _prevBg=prevBg;
   }
 
   // ────────────────────────────────────────────────────────────
-  // OPTIMIZED TRAY RENDERER
-  // Builds DOM once per startGame; on subsequent renders only
-  // patches the color/visibility of pre-built block elements.
+  // TRAY RENDERER
+  // FIX 9: filled.some() was O(n) per cell in nested loop → use Set lookup O(1)
   // ────────────────────────────────────────────────────────────
-  var _trayBuilt=[false,false,false]; // which slots have DOM built
-  var _trayBlocks=[null,null,null];   // array of block div refs per slot
+  var _trayBuilt=[false,false,false];
+  var _trayBlocks=[null,null,null];
 
   function buildTraySlot(i,piece){
     var slot=document.getElementById('tray-slot-'+i);
@@ -250,30 +280,31 @@ onReady(function initUI(){
     var shape=piece.shapeMatrix;
     var dims=BlockPuzzle.getDims(shape);
     var rows=dims.rows,cols=dims.cols;
-    var trayCellPx=9,trayMaxPx=65;
+    var trayCellPx=12,trayMaxPx=60;  // FIX: larger cell px, CSS scale(.55) removed so compensate here
     var maxDim=Math.max(rows,cols);
     var rawSize=maxDim*trayCellPx;
     var scale=rawSize>trayMaxPx?trayMaxPx/rawSize:1;
     scale=Math.max(0.4,Math.min(1,scale));
 
-    var filled=BlockPuzzle.getFilled(shape);
+    // FIX 9: Build Set for O(1) lookup instead of Array.some() per cell
+    var filledArr=BlockPuzzle.getFilled(shape);
+    var filledSet=Object.create(null);
+    for(var fi=0;fi<filledArr.length;fi++) filledSet[filledArr[fi][0]+','+filledArr[fi][1]]=1;
+
     var gridCont=document.createElement('div');
     gridCont.style.cssText='overflow:visible;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;transform:scale('+scale.toFixed(3)+');transform-origin:center center;';
 
     var blocks=[];
+    var baseStyle='width:'+trayCellPx+'px;height:'+trayCellPx+'px;border-radius:1px;';
+    var filledBg='background:'+getBg(piece.color)+';box-shadow:inset 0 1px 1px rgba(255,255,255,.3)';
     var frag=document.createDocumentFragment();
     for(var r=0;r<rows;r++){
       var rowDiv=document.createElement('div');
       rowDiv.style.cssText='display:flex;gap:1px;';
       for(var c=0;c<cols;c++){
-        var isF=filled.some(function(fc){return fc[0]===r&&fc[1]===c;});
+        var isF=!!filledSet[r+','+c];
         var block=document.createElement('div');
-        var baseStyle='width:'+trayCellPx+'px;height:'+trayCellPx+'px;border-radius:1px;';
-        if(isF){
-          block.style.cssText=baseStyle+'background:linear-gradient(135deg,'+piece.color+','+piece.color+'cc);box-shadow:inset 0 1px 1px rgba(255,255,255,.3),0 0 3px '+piece.color+'44;';
-        }else{
-          block.style.cssText=baseStyle+'background:transparent;';
-        }
+        block.style.cssText=baseStyle+(isF?filledBg:'background:transparent');
         block._isFilled=isF;
         blocks.push(block);
         rowDiv.appendChild(block);
@@ -295,8 +326,6 @@ onReady(function initUI(){
       var piece=pieces[i];
       var slot=document.getElementById('tray-slot-'+i);
       var built=_trayBlocks[i];
-
-      // If null -> empty
       if(piece===null){
         if(built!==null){
           slot.innerHTML='';
@@ -305,19 +334,15 @@ onReady(function initUI(){
         }
         continue;
       }
-
-      // If same piece id and color, don't rebuild — just ensure not empty
-      if(built&&built.piece&&built.piece.id===piece.id&&built.piece.color===piece.color){
+      // FIX: pieces have no .id — use reference equality
+      if(built&&built.piece===piece){
         slot.classList.remove('tray__slot--empty','tray__slot--selected');
         continue;
       }
-
-      // New piece — build fresh
       buildTraySlot(i,piece);
     }
   }
 
-  // Full tray rebuild (on game start)
   function buildTrayFull(){
     for(var i=0;i<3;i++){_trayBlocks[i]=null;}
     renderTray();
@@ -362,12 +387,11 @@ onReady(function initUI(){
         if(cnt>0){aR/=cnt;aC/=cnt;}
         var ct='+'+result.scoreGained;if(result.combo>1)ct+=' x'+result.combo+' Combo!';
         spawnComboPopup(ct,aR,aC);
-        // Blast then render — grid render cleans up blast classes
         BlockPuzzle.AnimCtrl.blastLines(result.rows,result.cols,$grid).then(function(){
-          // Clean up blast classes before rendering
           var cells=$grid.children;
           for(var i=0;i<cells.length;i++){cells[i].classList.remove('grid-cell--blast');cells[i].style.animationDelay='';}
-          _prevGrid=null; // force full repaint after blast
+          _prevGrid=null;
+          _prevBg=null; // FIX: also reset bg cache after blast
           renderGrid();renderTray();
         });
       }else{
@@ -409,7 +433,8 @@ onReady(function initUI(){
     $modeIndicator.textContent=mode.toUpperCase();
     $bestScore.textContent=BlockPuzzle.getModeHigh(mode);
     $curScore.textContent='0';
-    _prevGrid=null; // reset diff state
+    _prevGrid=null;
+    _prevBg=null;
     createGrid();
     renderGrid();
     buildTrayFull();

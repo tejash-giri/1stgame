@@ -102,21 +102,22 @@ html,body{
   contain:strict;
 }
 
-/* PERF: NO transition on grid-cell — was causing 36 simultaneous transitions */
+/* PERF: NO transition on grid-cell */
 .grid-cell{
   background:#2a2438;border-radius:3px;position:relative;
   border:1px solid rgba(255,255,255,.05);
-  /* Layer hint — compositor handles these cheaply */
-  will-change:background,opacity;
+  /* FIX: contain style — prevents CSS custom prop writes from cascading to siblings */
+  contain:style;
 }
 .grid-cell--dead{background:rgba(12,10,20,.92);border-color:rgba(255,255,255,.02)}
 
-/* Simplified filled cell — removed 6-layer box-shadow (huge paint cost) */
+/* FIX: Removed var(--block-glow) — CSS custom property writes on individual cells
+   trigger a full subtree style recalc on Android Chrome (massive jank source).
+   Static box-shadow only. Color info already in background gradient. */
 .grid-cell--filled{
   border-radius:3px;
   border:1px solid rgba(255,255,255,.18);
-  /* Reduced to 2 shadows — still looks great, paints 3× faster */
-  box-shadow:inset 0 2px 3px rgba(255,255,255,.35),0 0 8px var(--block-glow,transparent);
+  box-shadow:inset 0 2px 3px rgba(255,255,255,.35);
 }
 .grid-cell--filled::after{
   content:'';position:absolute;inset:0;border-radius:inherit;
@@ -164,25 +165,29 @@ html,body{
   border-radius:var(--r-md);display:flex;align-items:center;justify-content:center;
   cursor:grab;overflow:visible;position:relative;
   touch-action:none;-webkit-tap-highlight-color:transparent;
+  /* FIX: contain layout — tray slot changes don't trigger parent reflow */
+  contain:layout style;
 }
 .tray__slot:active{cursor:grabbing}
 .tray__slot--selected{border-color:var(--ice);border-style:solid}
 .tray__slot--empty{opacity:.15;cursor:default;pointer-events:none}
 
-/* Piece preview: scale fits inside slot */
-.piece-preview{pointer-events:none;display:flex;align-items:center;justify-content:center;overflow:visible;transform:scale(.55);transform-origin:center}
+/* Piece preview: scale is applied dynamically on inner gridCont per piece dims */
+.piece-preview{pointer-events:none;display:flex;align-items:center;justify-content:center;overflow:visible;}
 
-/* ── Drag Ghost — CSS classes for valid/invalid (no per-move style writes) ── */
+/* ── Drag Ghost ── */
+/* FIX: drop-shadow filter forces GPU compositing teardown on Android — removed entirely.
+   Use outline/border on ghost container instead (paint-only, no composite layer switch). */
 .drag-ghost{
   position:fixed;pointer-events:none;z-index:9999;opacity:.95;
   will-change:transform;
-  /* Default: no filter (fast) */
+  border-radius:4px;
 }
 .drag-ghost--valid{
-  filter:drop-shadow(0 6px 16px rgba(0,0,0,.55)) drop-shadow(0 0 10px rgba(105,240,174,.5));
+  outline:2px solid rgba(105,240,174,.7);
 }
 .drag-ghost--invalid{
-  filter:drop-shadow(0 6px 16px rgba(0,0,0,.55)) drop-shadow(0 0 10px rgba(255,82,82,.5));
+  outline:2px solid rgba(255,82,82,.7);
 }
 
 /* ── GAME OVER MODAL ── */

@@ -259,14 +259,16 @@ DragController.prototype.start=function(e,ti,piece,gridEl,slot){
   gs.gridTemplateColumns='repeat('+sC+',1fr)';
   gs.gap='2px';gs.opacity='0';
 
-  var filled=this._getFilled(piece.shapeMatrix);
+  var filledArr=this._getFilled(piece.shapeMatrix);
+  // FIX: O(1) lookup set instead of Array.some() per cell (was O(n²))
+  var filledSet=Object.create(null);
+  for(var fi=0;fi<filledArr.length;fi++) filledSet[filledArr[fi][0]+','+filledArr[fi][1]]=1;
+  // FIX: pre-build style string once, not per cell
+  var filledCss='background:linear-gradient(135deg,'+piece.color+','+piece.color+'dd);border-radius:4px;box-shadow:inset 0 2px 3px rgba(255,255,255,.4);';
   var frag=document.createDocumentFragment();
   for(var r=0;r<sR;r++)for(var c=0;c<sC;c++){
-    var isF=filled.some(function(fc){return fc[0]===r&&fc[1]===c;});
     var block=document.createElement('div');
-    if(isF){
-      block.style.cssText='background:linear-gradient(135deg,'+piece.color+','+piece.color+'dd);border-radius:4px;box-shadow:inset 0 2px 3px rgba(255,255,255,0.4),0 0 8px '+piece.color+'66;';
-    }
+    if(filledSet[r+','+c]) block.style.cssText=filledCss;
     frag.appendChild(block);
   }
   this._ghost.appendChild(frag);
