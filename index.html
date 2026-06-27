@@ -4,7 +4,9 @@
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=no,viewport-fit=cover"/>
   <meta name="apple-mobile-web-app-capable" content="yes"/>
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translacent"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+  <meta name="mobile-web-app-capable" content="yes"/>
+  <meta name="theme-color" content="#13111c"/>
   <title>Block Puzzle</title>
   <link rel="stylesheet" href="style.css"/>
 </head>
@@ -135,7 +137,7 @@ onReady(function initUI(){
     layoutCache.wrapTop = wr.top;
   }
   window.addEventListener('resize', updateLayoutCache);
-  window.addEventListener('orientationchange', updateLayoutCache);
+  window.addEventListener('orientationchange', function(){ setTimeout(updateLayoutCache, 200); });
 
   function showScreen(name){
     ui.screen=name;
@@ -197,6 +199,47 @@ onReady(function initUI(){
         if(el){
           el.classList.add(addCls);
           _projCells.push(idx);
+        }
+      }
+    }
+  }
+
+  // Near-clear highlight: pulse rows/cols that are 1 cell away from full
+  var _nearClearSet = [];
+  function applyNearClear(){
+    // Remove old
+    var cells=$grid.children;
+    for(var i=0;i<_nearClearSet.length;i++) cells[_nearClearSet[i]].classList.remove('grid-cell--near-clear');
+    _nearClearSet.length=0;
+    var grid=BlockPuzzle.G.grid;
+    var THRESHOLD=1; // cells missing to light up
+    // Check rows
+    for(var r=0;r<GRID;r++){
+      var empty=0;
+      for(var c=0;c<GRID;c++) if(grid[r][c]===0) empty++;
+      if(empty>0&&empty<=THRESHOLD){
+        for(var c=0;c<GRID;c++){
+          if(grid[r][c]===0){
+            var idx=r*GRID+c;
+            cells[idx].classList.add('grid-cell--near-clear');
+            _nearClearSet.push(idx);
+          }
+        }
+      }
+    }
+    // Check cols
+    for(var c=0;c<GRID;c++){
+      var empty=0;
+      for(var r=0;r<GRID;r++) if(grid[r][c]===0) empty++;
+      if(empty>0&&empty<=THRESHOLD){
+        for(var r=0;r<GRID;r++){
+          if(grid[r][c]===0){
+            var idx=r*GRID+c;
+            if(_nearClearSet.indexOf(idx)===-1){
+              cells[idx].classList.add('grid-cell--near-clear');
+              _nearClearSet.push(idx);
+            }
+          }
         }
       }
     }
@@ -381,7 +424,7 @@ onReady(function initUI(){
           for(var i=0;i<cells.length;i++){cells[i].classList.remove('grid-cell--blast');cells[i].style.animationDelay='';}
           _prevGrid=null;
           _prevBg=null;
-          renderGrid();renderTray();
+          renderGrid();applyNearClear();renderTray();
           if(result.endState&&result.endState.state==='gameover'){
             setTimeout(function(){
               var fs=Math.floor(gs.currentScore);
@@ -391,7 +434,7 @@ onReady(function initUI(){
           }
         });
       }else{
-        renderGrid();renderTray();
+        renderGrid();applyNearClear();renderTray();
         if(result.endState&&result.endState.state==='gameover'){
           setTimeout(function(){
             var fs=Math.floor(gs.currentScore);
@@ -436,7 +479,10 @@ onReady(function initUI(){
 
   document.getElementById('btn-back').onclick=function(){showScreen('menu');updateModeBestScores();};
   [0,1,2].forEach(function(i){
-    document.getElementById('tray-slot-'+i).addEventListener('pointerdown',function(e){onTrayPointerDown(e,i);});
+    var s=document.getElementById('tray-slot-'+i);
+    s.addEventListener('pointerdown',function(e){onTrayPointerDown(e,i);});
+    // Prevent passive touchstart from causing scroll bleed on Android
+    s.addEventListener('touchstart',function(e){if(e.cancelable)e.preventDefault();},{passive:false});
   });
   document.getElementById('btn-go-menu').onclick=function(){hideGameOver();showScreen('menu');updateModeBestScores();};
   document.getElementById('btn-go-retry').onclick=function(){hideGameOver();startGame(ui.activeMode);};

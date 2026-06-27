@@ -362,7 +362,7 @@ DragController.prototype._finish=function(cx,cy,cancelled){
   var ghostW=dims.cols*this._cellSize;
   var ghostH=dims.rows*this._cellSize;
   var ghostCX=cx; // ghost cx = pointer x (centered horizontally)
-  var ghostCY=(cx,cy-80-ghostH/2); // ghost top = cy-ghostH-80, center = +ghostH/2
+  var ghostCY=cy-80-ghostH/2; // ghost top = cy-ghostH-80, center = +ghostH/2
   var aC=Math.floor((ghostCX-this._gridRect.left)/this._cellSize - dims.cols/2 + 0.5);
   var aR=Math.floor(((cy-80-ghostH/2)-this._gridRect.top)/this._cellSize - dims.rows/2 + 0.5);
   var self=this;

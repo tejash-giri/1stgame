@@ -90,7 +90,7 @@ html,body{
 .score-best span{color:var(--gold);font-weight:700}
 
 /* ── 6×6 GRID ── */
-.grid-wrapper{flex:1;display:flex;align-items:center;justify-content:center;padding:4px;min-height:0;position:relative}
+.grid-wrapper{flex:1;display:flex;align-items:center;justify-content:center;padding:4px;min-height:0;position:relative;contain:layout}
 
 .grid-canvas{
   display:grid;grid-template-columns:repeat(6,minmax(0,1fr));grid-template-rows:repeat(6,minmax(0,1fr));
@@ -140,11 +140,24 @@ html,body{
 }
 
 /* ── Blast Animation ── */
+/* FIX: No filter:brightness — forces compositing layer switch on Android mid-animation */
 .grid-cell--blast{animation:blastCell 0.38s cubic-bezier(.4,0,.2,1) forwards}
 @keyframes blastCell{
-  0%{transform:scale(1);opacity:1;filter:brightness(1)}
-  20%{transform:scale(1.12);opacity:1;filter:brightness(2.2)}
-  100%{transform:scale(.2);opacity:0;filter:brightness(.5)}
+  0%{transform:scale(1);opacity:1}
+  20%{transform:scale(1.14);opacity:1}
+  100%{transform:scale(.18);opacity:0}
+}
+
+/* ── Near-Clear Row/Col Pulse ── */
+/* Lights up empty cells in rows/cols that are 1 block away from clearing */
+.grid-cell--near-clear{
+  background:rgba(255,215,64,.22)!important;
+  animation:nearClearPulse 1.1s ease-in-out infinite;
+  z-index:1;
+}
+@keyframes nearClearPulse{
+  0%,100%{background:rgba(255,215,64,.15)!important;box-shadow:none}
+  50%{background:rgba(255,215,64,.38)!important;box-shadow:inset 0 0 6px rgba(255,215,64,.4)}
 }
 
 .combo-popup{
@@ -184,6 +197,8 @@ html,body{
   position:fixed;pointer-events:none;z-index:9999;opacity:.95;
   will-change:transform;
   border-radius:4px;
+  /* Promote ghost sub-cells to GPU as a single layer */
+  transform:translateZ(0);
 }
 .drag-ghost--valid{
   outline:2px solid rgba(105,240,174,.7);
